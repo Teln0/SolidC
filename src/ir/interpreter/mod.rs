@@ -357,44 +357,49 @@ impl IRInterpreter {
                     }
                 }
                 IRCompKind::Alloc(ir_type) => {
-                    let index = self.stack.values.len();
                     *self.stack.frames.last_mut().unwrap() += 1;
 
                     let bytes = vec![0; ir_type.size as usize];
                     self.stack.values.push(IRInterpreterValue { bytes });
+                    let ptr = self.stack.values.last().unwrap().bytes.as_ptr() as u64;
 
-                    IRInterpreterValue::from_u64(index as u64)
+                    IRInterpreterValue::from_u64(ptr)
                 }
-                IRCompKind::Store(_, location, value) => {
+                IRCompKind::Store(ir_type, location, value) => {
                     let value = &values[value.index as usize];
-                    let index = values[location.index as usize].into_u64();
-                    self.stack.values[index as usize] = value.clone();
+                    let ptr = values[location.index as usize].into_u64() as *mut u8;
+                    let slice = std::slice::from_raw_parts_mut(ptr, ir_type.size as usize);
+                    for i in 0..slice.len() {
+                        slice[i] = value.bytes[i];
+                    }
+
                     IRInterpreterValue::void()
                 }
-                IRCompKind::Load(_, location) => {
-                    let index = values[location.index as usize].into_u64();
-                    self.stack.values[index as usize].clone()
-                }
-                IRCompKind::OffsetStore(_, location, value, offset) => {
-                    let value = values[value.index as usize].clone();
-                    let index = values[location.index as usize].into_u64();
-                    let store = &mut self.stack.values[index as usize];
-                    for i in 0..value.bytes.len() {
-                        store.bytes[i + *offset as usize] = value.bytes[i];
+                IRCompKind::Load(ir_type, location) => {
+                    let ptr = values[location.index as usize].into_u64() as *const u8;
+                    let slice = std::slice::from_raw_parts(ptr, ir_type.size as usize);
+
+                    IRInterpreterValue {
+                        bytes: slice.to_vec()
                     }
+                }
+                IRCompKind::OffsetStore(ir_type, location, value, offset) => {
+                    let value = &values[value.index as usize];
+                    let ptr = (values[location.index as usize].into_u64() + *offset) as *mut u8;
+                    let slice = std::slice::from_raw_parts_mut(ptr, ir_type.size as usize);
+                    for i in 0..slice.len() {
+                        slice[i] = value.bytes[i];
+                    }
+
                     IRInterpreterValue::void()
                 }
                 IRCompKind::OffsetLoad(ir_type, location, offset) => {
-                    let size = ir_type.size as usize;
-                    let offset = *offset as usize;
+                    let ptr = (values[location.index as usize].into_u64() + *offset) as *const u8;
+                    let slice = std::slice::from_raw_parts(ptr, ir_type.size as usize);
 
-                    let index = values[location.index as usize].into_u64();
-                    let value = &self.stack.values[index as usize];
-                    let mut bytes = Vec::with_capacity(size);
-                    for i in offset..(offset + size) {
-                        bytes.push(value.bytes[i]);
+                    IRInterpreterValue {
+                        bytes: slice.to_vec()
                     }
-                    IRInterpreterValue { bytes }
                 }
                 IRCompKind::Return(value) => {
                     let value = &values[value.index as usize];

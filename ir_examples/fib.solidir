@@ -1,11 +1,3 @@
-use solidc::globals::SessionGlobals;
-use solidc::solidlang::lexer::lex;
-use solidc::solidlang::parser::Parser;
-
-fn main() {
-    SessionGlobals::create(|| {
-        /*
-        let src = "\
 fn fib: (1 1) -> (1 1)
     ; Seq numbers
     alloc (2 1) ;                  %1
@@ -40,21 +32,3 @@ fn fib: (1 1) -> (1 1)
     offsetload (1 1) %1 0 ;        %19
     return %19 ;                   %20
 endfn
-";
-        let module = assemble_ir_module(src).unwrap();
-        let mut interpreter = IRInterpreter::new();
-        interpreter.load_module(module);
-        let function_name = SessionGlobals::with_interner_mut(|i| i.intern("fib"));
-        let returned = unsafe { interpreter.call_function(function_name, &[IRInterpreterValue::from_u8(10)]) };
-         */
-
-        let src = "
-fn main() -> i32 {
-    return 5;
-}
-    ";
-
-        let mut parser = Parser::new(lex(src), src);
-        let module = parser.parse_module().unwrap();
-    });
-}
