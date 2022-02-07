@@ -1,76 +1,76 @@
 use crate::globals::Symbol;
 use crate::solidlang::span::Span;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ASTModule {
     pub items: Vec<ASTItem>,
 
-    pub span: Span
+    pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ASTItemKind {
     FunctionDef(ASTFunctionDef),
     StructDef(ASTStructDef),
-    Template(ASTTemplate)
+    Template(ASTTemplate),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ASTItem {
     pub kind: ASTItemKind,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ASTFunctionDef {
     pub name: Symbol,
     pub return_type: Option<ASTType>,
     pub params: Vec<ASTNameAndType>,
     pub statement_block: ASTStatementBlock,
 
-    pub span: Span
+    pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ASTStructDef {
     pub name: Symbol,
     pub fields: Vec<ASTNameAndType>,
 
-    pub span: Span
+    pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ASTTemplate {
     pub params: Vec<Symbol>,
     pub items: Vec<ASTItem>,
 
-    pub span: Span
+    pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ASTTypeKind {
     Path {
         symbols: Vec<Symbol>,
-        generic_args: Vec<ASTType>
+        generic_args: Vec<ASTType>,
     },
-    PointerTo(Box<ASTType>)
+    PointerTo(Box<ASTType>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ASTType {
     pub kind: ASTTypeKind,
 
-    pub span: Span
+    pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ASTNameAndType {
     pub name: Symbol,
     pub ast_type: ASTType,
 
-    pub span: Span
+    pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ASTStatementKind {
     // TODO : Matching local binding
     LocalBinding(Symbol, Option<ASTType>, Option<ASTExpression>),
@@ -79,24 +79,24 @@ pub enum ASTStatementKind {
     Break,
     Continue,
     Item(ASTItem),
-    Semicolon
+    Semicolon,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ASTStatementBlock {
     pub statements: Vec<ASTStatement>,
 
-    pub span: Span
+    pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ASTStatement {
     pub kind: ASTStatementKind,
 
-    pub span: Span
+    pub span: Span,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ASTOperator {
     Assign,
 
@@ -124,7 +124,7 @@ pub enum ASTOperator {
     LesserEqual,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ASTExpressionKind {
     Ident(Symbol),
     IntegerLiteral(u64),
@@ -132,7 +132,11 @@ pub enum ASTExpressionKind {
     UnaryOperation(ASTOperator, Box<ASTExpression>),
     BinaryOperation(ASTOperator, Box<ASTExpression>, Box<ASTExpression>),
 
-    If(Box<ASTExpression>, ASTStatementBlock, Option<ASTStatementBlock>),
+    If(
+        Box<ASTExpression>,
+        ASTStatementBlock,
+        Option<ASTStatementBlock>,
+    ),
     While(Box<ASTExpression>, ASTStatementBlock),
     Loop(ASTStatementBlock),
     For(Symbol, Box<ASTExpression>, ASTStatementBlock),
@@ -142,16 +146,14 @@ pub enum ASTExpressionKind {
     Index(Box<ASTExpression>, Box<ASTExpression>),
 
     MemberAccess(Box<ASTExpression>, Symbol),
-    StaticAccess(Box<ASTExpression>, Symbol)
-
-    // TODO : Match
+    StaticAccess(Box<ASTExpression>, Symbol), // TODO : Match
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ASTExpression {
     pub kind: ASTExpressionKind,
 
-    pub span: Span
+    pub span: Span,
 }
 
 impl ASTStatement {
@@ -162,11 +164,11 @@ impl ASTStatement {
                 ASTExpressionKind::While(_, _) => false,
                 ASTExpressionKind::Loop(_) => false,
                 ASTExpressionKind::For(_, _, _) => false,
-                _ => true
-            }
+                _ => true,
+            },
             ASTStatementKind::Item(_) => false,
             ASTStatementKind::Semicolon => false,
-            _ => true
+            _ => true,
         }
     }
 }

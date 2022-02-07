@@ -3,7 +3,9 @@ use crate::solidlang::lexer::{Token, TokenKind};
 use crate::solidlang::parser::{Parser, ParserResult};
 
 impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
-    pub (in crate::solidlang::parser) fn parse_name_and_type(&mut self) -> ParserResult<ASTNameAndType> {
+    pub(in crate::solidlang::parser) fn parse_name_and_type(
+        &mut self,
+    ) -> ParserResult<ASTNameAndType> {
         self.start_span();
 
         let name = self.expect_ident()?;
@@ -13,11 +15,11 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
         Ok(ASTNameAndType {
             name,
             ast_type,
-            span: self.close_span()
+            span: self.close_span(),
         })
     }
 
-    pub (in crate::solidlang::parser) fn parse_type(&mut self) -> ParserResult<ASTType> {
+    pub(in crate::solidlang::parser) fn parse_type(&mut self) -> ParserResult<ASTType> {
         self.start_span();
 
         if self.check(TokenKind::Ident) {
@@ -39,8 +41,11 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
             }
 
             return Ok(ASTType {
-                kind: ASTTypeKind::Path { symbols, generic_args },
-                span: self.close_span()
+                kind: ASTTypeKind::Path {
+                    symbols,
+                    generic_args,
+                },
+                span: self.close_span(),
             });
         }
 
@@ -48,7 +53,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
             self.advance();
             return Ok(ASTType {
                 kind: ASTTypeKind::PointerTo(Box::new(self.parse_type()?)),
-                span: self.close_span()
+                span: self.close_span(),
             });
         }
 

@@ -1,15 +1,18 @@
+use crate::globals::SessionGlobals;
+use crate::ir::comp::{
+    IRComp, IRCompBinaryOperation, IRCompBinaryOperationKind, IRCompConstant, IRCompFunctionCall,
+    IRCompKind, IRCompUnaryOperation, IRCompUnaryOperationKind,
+};
+use crate::ir::{IRItem, IRItemFunctionDef, IRItemKind, IRModule, IRType, IRValue};
 use std::iter::Peekable;
 use std::str::Chars;
-use crate::globals::SessionGlobals;
-use crate::ir::{IRItem, IRItemFunctionDef, IRItemKind, IRModule, IRType, IRValue};
-use crate::ir::comp::{IRComp, IRCompBinaryOperation, IRCompBinaryOperationKind, IRCompConstant, IRCompFunctionCall, IRCompKind, IRCompUnaryOperation, IRCompUnaryOperationKind};
 
 const EOF_CHAR: char = '\0';
 
 struct IRAsssmblyLexerCursor<'a> {
     initial_len: usize,
     lines_consumed: usize,
-    chars: Chars<'a>
+    chars: Chars<'a>,
 }
 
 fn is_word_char(c: char) -> bool {
@@ -42,7 +45,9 @@ impl<'a> IRAsssmblyLexerCursor<'a> {
 
     fn bump(&mut self) -> char {
         let c = self.chars.next().unwrap_or(EOF_CHAR);
-        if c == '\n' { self.lines_consumed += 1 }
+        if c == '\n' {
+            self.lines_consumed += 1
+        }
         c
     }
 
@@ -71,7 +76,10 @@ impl<'a> IRAsssmblyLexerCursor<'a> {
         let offset = self.consumed();
 
         if self.nth(0) == EOF_CHAR {
-            return IRAssemblyThinToken { kind: IRAssemblyTokenKind::Eof, offset };
+            return IRAssemblyThinToken {
+                kind: IRAssemblyTokenKind::Eof,
+                offset,
+            };
         }
 
         let kind = match self.bump() {
@@ -90,8 +98,7 @@ impl<'a> IRAsssmblyLexerCursor<'a> {
                 }
                 if is_word_char(self.nth(0)) {
                     IRAssemblyTokenKind::UnexpectedCharacter
-                }
-                else {
+                } else {
                     IRAssemblyTokenKind::Integer
                 }
             }
@@ -124,7 +131,7 @@ enum IRAssemblyTokenKind {
 
 struct IRAssemblyThinToken {
     kind: IRAssemblyTokenKind,
-    offset: usize
+    offset: usize,
 }
 
 #[derive(Debug)]
@@ -132,10 +139,10 @@ struct IRAssemblyToken {
     kind: IRAssemblyTokenKind,
     start: usize,
     len: usize,
-    line: usize
+    line: usize,
 }
 
-fn assembly_token_stream(src: &str) -> impl Iterator<Item=IRAssemblyToken> + '_ {
+fn assembly_token_stream(src: &str) -> impl Iterator<Item = IRAssemblyToken> + '_ {
     let mut cursor = IRAsssmblyLexerCursor::new(src);
     let mut current_pos = 0;
     let mut current_line = 0;
@@ -148,7 +155,7 @@ fn assembly_token_stream(src: &str) -> impl Iterator<Item=IRAssemblyToken> + '_ 
             kind: token.kind,
             start: current_pos + token.offset,
             len: cursor.consumed() - token.offset,
-            line: current_line
+            line: current_line,
         };
         current_pos += consumed;
         current_line += lines_consumed;
@@ -168,7 +175,7 @@ pub struct IRAssemblerError {
 #[derive(Debug)]
 enum IRAssemblerExpected<'a> {
     Keyword(&'a str),
-    Kind(IRAssemblyTokenKind)
+    Kind(IRAssemblyTokenKind),
 }
 
 type IRAssemblerResult<T> = Result<T, IRAssemblerError>;
@@ -176,7 +183,7 @@ type IRAssemblerResult<T> = Result<T, IRAssemblerError>;
 struct IRAssembler<'a, T: Iterator<Item = IRAssemblyToken>> {
     token_stream: Peekable<T>,
     src: &'a str,
-    expected: Vec<IRAssemblerExpected<'a>>
+    expected: Vec<IRAssemblerExpected<'a>>,
 }
 
 impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
@@ -184,7 +191,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
         Self {
             token_stream: token_stream.peekable(),
             src,
-            expected: vec![]
+            expected: vec![],
         }
     }
 
@@ -205,12 +212,15 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
         if token.kind == kind {
             self.expected.clear();
             Ok(token)
-        }
-        else {
+        } else {
             Err(IRAssemblerError {
-                message: format!("Expected \"{:?}\" got \"{}\"", self.expected, &self.src[token.start..(token.start + token.len)]),
+                message: format!(
+                    "Expected \"{:?}\" got \"{}\"",
+                    self.expected,
+                    &self.src[token.start..(token.start + token.len)]
+                ),
                 start: token.start,
-                line: token.line
+                line: token.line,
             })
         }
     }
@@ -229,32 +239,36 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
     fn error_unexpected(&mut self) -> IRAssemblerError {
         let token = self.token_stream.next().unwrap();
         IRAssemblerError {
-            message: format!("Expected \"{:?}\" got \"{}\"", self.expected, &self.src[token.start..(token.start + token.len)]),
+            message: format!(
+                "Expected \"{:?}\" got \"{}\"",
+                self.expected,
+                &self.src[token.start..(token.start + token.len)]
+            ),
             start: token.start,
-            line: token.line
+            line: token.line,
         }
     }
 
     fn parse_integer_u64(&mut self) -> IRAssemblerResult<u64> {
         let token = self.expect_kind(IRAssemblyTokenKind::Integer)?;
-        self.get_token_string(&token).parse().map_err(|_| {
-            IRAssemblerError {
+        self.get_token_string(&token)
+            .parse()
+            .map_err(|_| IRAssemblerError {
                 message: format!("Expected integer to fit into 64 bits"),
                 start: token.start,
-                line: token.line
-            }
-        })
+                line: token.line,
+            })
     }
 
     fn parse_integer_u8(&mut self) -> IRAssemblerResult<u8> {
         let token = self.expect_kind(IRAssemblyTokenKind::Integer)?;
-        self.get_token_string(&token).parse().map_err(|_| {
-            IRAssemblerError {
+        self.get_token_string(&token)
+            .parse()
+            .map_err(|_| IRAssemblerError {
                 message: format!("Expected integer to fit into 8 bits"),
                 start: token.start,
-                line: token.line
-            }
-        })
+                line: token.line,
+            })
     }
 
     fn parse_ir_type(&mut self) -> IRAssemblerResult<IRType> {
@@ -263,16 +277,13 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
         let align = self.parse_integer_u64()?;
         self.expect_kind(IRAssemblyTokenKind::RParen)?;
 
-        return Ok(IRType {
-            size,
-            align
-        });
+        return Ok(IRType { size, align });
     }
 
     fn parse_ir_value(&mut self) -> IRAssemblerResult<IRValue> {
         self.expect_kind(IRAssemblyTokenKind::Percent)?;
         Ok(IRValue {
-            index: self.parse_integer_u64()?
+            index: self.parse_integer_u64()?,
         })
     }
 
@@ -293,10 +304,9 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
                 args.push(self.parse_ir_value()?);
             }
 
-            return Ok(IRComp { kind: IRCompKind::FunctionCall(IRCompFunctionCall {
-                name,
-                args
-            }) });
+            return Ok(IRComp {
+                kind: IRCompKind::FunctionCall(IRCompFunctionCall { name, args }),
+            });
         }
         if self.check_keyword("binop") {
             // Binary operation
@@ -304,34 +314,51 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
 
             let mut operation_kind = None;
 
-            if self.check_keyword("+") { operation_kind = Some(IRCompBinaryOperationKind::Plus) }
-            else if self.check_keyword("-") { operation_kind = Some(IRCompBinaryOperationKind::Minus) }
-            else if self.check_keyword("*") { operation_kind = Some(IRCompBinaryOperationKind::Mul) }
-            else if self.check_keyword("/") { operation_kind = Some(IRCompBinaryOperationKind::Div) }
-            else if self.check_keyword("mod") { operation_kind = Some(IRCompBinaryOperationKind::Mod) }
-            else if self.check_keyword("&") { operation_kind = Some(IRCompBinaryOperationKind::BitAnd) }
-            else if self.check_keyword("|") { operation_kind = Some(IRCompBinaryOperationKind::BitOr) }
-            else if self.check_keyword("<<") { operation_kind = Some(IRCompBinaryOperationKind::BitLShift) }
-            else if self.check_keyword(">>") { operation_kind = Some(IRCompBinaryOperationKind::BitRShift) }
-            else if self.check_keyword("==") { operation_kind = Some(IRCompBinaryOperationKind::Equal) }
-            else if self.check_keyword("!=") { operation_kind = Some(IRCompBinaryOperationKind::NotEqual) }
-            else if self.check_keyword("<") { operation_kind = Some(IRCompBinaryOperationKind::Lesser) }
-            else if self.check_keyword(">") { operation_kind = Some(IRCompBinaryOperationKind::Greater) }
-            else if self.check_keyword("<=") { operation_kind = Some(IRCompBinaryOperationKind::LesserEqual) }
-            else if self.check_keyword(">=") { operation_kind = Some(IRCompBinaryOperationKind::GreaterEqual) }
+            if self.check_keyword("+") {
+                operation_kind = Some(IRCompBinaryOperationKind::Plus)
+            } else if self.check_keyword("-") {
+                operation_kind = Some(IRCompBinaryOperationKind::Minus)
+            } else if self.check_keyword("*") {
+                operation_kind = Some(IRCompBinaryOperationKind::Mul)
+            } else if self.check_keyword("/") {
+                operation_kind = Some(IRCompBinaryOperationKind::Div)
+            } else if self.check_keyword("mod") {
+                operation_kind = Some(IRCompBinaryOperationKind::Mod)
+            } else if self.check_keyword("&") {
+                operation_kind = Some(IRCompBinaryOperationKind::BitAnd)
+            } else if self.check_keyword("|") {
+                operation_kind = Some(IRCompBinaryOperationKind::BitOr)
+            } else if self.check_keyword("<<") {
+                operation_kind = Some(IRCompBinaryOperationKind::BitLShift)
+            } else if self.check_keyword(">>") {
+                operation_kind = Some(IRCompBinaryOperationKind::BitRShift)
+            } else if self.check_keyword("==") {
+                operation_kind = Some(IRCompBinaryOperationKind::Equal)
+            } else if self.check_keyword("!=") {
+                operation_kind = Some(IRCompBinaryOperationKind::NotEqual)
+            } else if self.check_keyword("<") {
+                operation_kind = Some(IRCompBinaryOperationKind::Lesser)
+            } else if self.check_keyword(">") {
+                operation_kind = Some(IRCompBinaryOperationKind::Greater)
+            } else if self.check_keyword("<=") {
+                operation_kind = Some(IRCompBinaryOperationKind::LesserEqual)
+            } else if self.check_keyword(">=") {
+                operation_kind = Some(IRCompBinaryOperationKind::GreaterEqual)
+            }
             self.advance_token();
 
             let left_operand = self.parse_ir_value()?;
             let right_operand = self.parse_ir_value()?;
 
             if let Some(operation_kind) = operation_kind {
-                return Ok(IRComp { kind: IRCompKind::BinaryOperation(IRCompBinaryOperation {
-                    kind: operation_kind,
-                    left_operand,
-                    right_operand
-                }) });
-            }
-            else {
+                return Ok(IRComp {
+                    kind: IRCompKind::BinaryOperation(IRCompBinaryOperation {
+                        kind: operation_kind,
+                        left_operand,
+                        right_operand,
+                    }),
+                });
+            } else {
                 return Err(self.error_unexpected());
             }
         }
@@ -340,18 +367,22 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
             self.advance_token();
             let mut operation_kind = None;
 
-            if self.check_keyword("not") { operation_kind = Some(IRCompUnaryOperationKind::BoolNot) }
-            else if self.check_keyword("neg") { operation_kind = Some(IRCompUnaryOperationKind::SignedNegation) }
+            if self.check_keyword("not") {
+                operation_kind = Some(IRCompUnaryOperationKind::BoolNot)
+            } else if self.check_keyword("neg") {
+                operation_kind = Some(IRCompUnaryOperationKind::SignedNegation)
+            }
 
             let operand = self.parse_ir_value()?;
 
             if let Some(operation_kind) = operation_kind {
-                return Ok(IRComp { kind: IRCompKind::UnaryOperation(IRCompUnaryOperation {
-                    kind: operation_kind,
-                    operand
-                }) });
-            }
-            else {
+                return Ok(IRComp {
+                    kind: IRCompKind::UnaryOperation(IRCompUnaryOperation {
+                        kind: operation_kind,
+                        operand,
+                    }),
+                });
+            } else {
                 return Err(self.error_unexpected());
             }
         }
@@ -365,16 +396,18 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
                 bytes.push(self.parse_integer_u8()?);
             }
 
-            return Ok(IRComp { kind: IRCompKind::Constant(IRCompConstant {
-                bytes
-            }) });
+            return Ok(IRComp {
+                kind: IRCompKind::Constant(IRCompConstant { bytes }),
+            });
         }
         if self.check_keyword("alloc") {
             // Stack allocation
             self.advance_token();
 
             let ir_type = self.parse_ir_type()?;
-            return Ok(IRComp { kind: IRCompKind::Alloc(ir_type) });
+            return Ok(IRComp {
+                kind: IRCompKind::Alloc(ir_type),
+            });
         }
         if self.check_keyword("store") {
             // Store in pointer
@@ -384,7 +417,9 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
             let location = self.parse_ir_value()?;
             let value = self.parse_ir_value()?;
 
-            return Ok(IRComp { kind: IRCompKind::Store(ir_type, location, value) });
+            return Ok(IRComp {
+                kind: IRCompKind::Store(ir_type, location, value),
+            });
         }
         if self.check_keyword("load") {
             // Load from pointer
@@ -393,7 +428,9 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
             let ir_type = self.parse_ir_type()?;
             let location = self.parse_ir_value()?;
 
-            return Ok(IRComp { kind: IRCompKind::Load(ir_type, location) });
+            return Ok(IRComp {
+                kind: IRCompKind::Load(ir_type, location),
+            });
         }
         if self.check_keyword("offsetstore") {
             // Store in pointer
@@ -404,7 +441,9 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
             let value = self.parse_ir_value()?;
             let offset = self.parse_integer_u64()?;
 
-            return Ok(IRComp { kind: IRCompKind::OffsetStore(ir_type, location, value, offset) });
+            return Ok(IRComp {
+                kind: IRCompKind::OffsetStore(ir_type, location, value, offset),
+            });
         }
         if self.check_keyword("offsetload") {
             // Load from pointer
@@ -414,7 +453,9 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
             let location = self.parse_ir_value()?;
             let offset = self.parse_integer_u64()?;
 
-            return Ok(IRComp { kind: IRCompKind::OffsetLoad(ir_type, location, offset) });
+            return Ok(IRComp {
+                kind: IRCompKind::OffsetLoad(ir_type, location, offset),
+            });
         }
         if self.check_keyword("return") {
             // Return from function
@@ -422,7 +463,9 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
 
             let value = self.parse_ir_value()?;
 
-            return Ok(IRComp { kind: IRCompKind::Return(value) });
+            return Ok(IRComp {
+                kind: IRCompKind::Return(value),
+            });
         }
         if self.check_keyword("if") {
             // If branching
@@ -431,7 +474,9 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
             let value = self.parse_ir_value()?;
             let location = self.parse_integer_u64()?;
 
-            return Ok(IRComp { kind: IRCompKind::If(value, location) });
+            return Ok(IRComp {
+                kind: IRCompKind::If(value, location),
+            });
         }
         if self.check_keyword("jmp") {
             // Jump
@@ -439,7 +484,9 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
 
             let location = self.parse_integer_u64()?;
 
-            return Ok(IRComp { kind: IRCompKind::Jmp(location) });
+            return Ok(IRComp {
+                kind: IRCompKind::Jmp(location),
+            });
         }
 
         Err(self.error_unexpected())
@@ -474,20 +521,20 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
                 }
                 self.advance_token();
 
-                items.push(IRItem { kind: IRItemKind::FunctionDef(IRItemFunctionDef {
-                    name: SessionGlobals::with_interner_mut(|i| i.intern(name)),
-                    params,
-                    return_type,
-                    comps
-                }) });
+                items.push(IRItem {
+                    kind: IRItemKind::FunctionDef(IRItemFunctionDef {
+                        name: SessionGlobals::with_interner_mut(|i| i.intern(name)),
+                        params,
+                        return_type,
+                        comps,
+                    }),
+                });
 
                 continue;
             }
 
             if self.check_kind(IRAssemblyTokenKind::Eof) {
-                return Ok(IRModule {
-                    items
-                })
+                return Ok(IRModule { items });
             }
 
             return Err(self.error_unexpected());

@@ -1,12 +1,12 @@
+use crate::globals::Symbol;
+use crate::ir::comp::{IRCompBinaryOperationKind, IRCompKind, IRCompUnaryOperationKind};
+use crate::ir::{IRItemFunctionDef, IRItemKind, IRModule};
 use std::collections::HashMap;
 use std::ops::Rem;
-use crate::globals::Symbol;
-use crate::ir::{IRItemFunctionDef, IRItemKind, IRModule};
-use crate::ir::comp::{IRCompBinaryOperationKind, IRCompKind, IRCompUnaryOperationKind};
 
 #[derive(Debug, Clone)]
 pub struct IRInterpreterValue {
-    pub bytes: Vec<u8>
+    pub bytes: Vec<u8>,
 }
 
 impl IRInterpreterValue {
@@ -15,56 +15,54 @@ impl IRInterpreterValue {
     }
 
     pub fn from_u8(value: u8) -> Self {
-        Self {
-            bytes: vec![value]
-        }
+        Self { bytes: vec![value] }
     }
 
     pub fn from_i8(value: i8) -> Self {
         Self {
-            bytes: vec![unsafe { std::mem::transmute(value) }]
+            bytes: vec![unsafe { std::mem::transmute(value) }],
         }
     }
 
     pub fn from_u16(value: u16) -> Self {
         let bytes: [u8; 2] = unsafe { std::mem::transmute(value) };
         Self {
-            bytes: bytes.to_vec()
+            bytes: bytes.to_vec(),
         }
     }
 
     pub fn from_i16(value: i16) -> Self {
         let bytes: [u8; 2] = unsafe { std::mem::transmute(value) };
         Self {
-            bytes: bytes.to_vec()
+            bytes: bytes.to_vec(),
         }
     }
 
     pub fn from_u32(value: u32) -> Self {
         let bytes: [u8; 4] = unsafe { std::mem::transmute(value) };
         Self {
-            bytes: bytes.to_vec()
+            bytes: bytes.to_vec(),
         }
     }
 
     pub fn from_i32(value: i32) -> Self {
         let bytes: [u8; 4] = unsafe { std::mem::transmute(value) };
         Self {
-            bytes: bytes.to_vec()
+            bytes: bytes.to_vec(),
         }
     }
 
     pub fn from_u64(value: u64) -> Self {
         let bytes: [u8; 8] = unsafe { std::mem::transmute(value) };
         Self {
-            bytes: bytes.to_vec()
+            bytes: bytes.to_vec(),
         }
     }
 
     pub fn from_i64(value: i64) -> Self {
         let bytes: [u8; 8] = unsafe { std::mem::transmute(value) };
         Self {
-            bytes: bytes.to_vec()
+            bytes: bytes.to_vec(),
         }
     }
 
@@ -79,7 +77,7 @@ impl IRInterpreterValue {
     pub fn into_u16(&self) -> u16 {
         union U {
             val: u16,
-            bytes: [u8; 2]
+            bytes: [u8; 2],
         }
 
         unsafe {
@@ -94,7 +92,7 @@ impl IRInterpreterValue {
     pub fn into_i16(&self) -> i16 {
         union U {
             val: i16,
-            bytes: [u8; 2]
+            bytes: [u8; 2],
         }
 
         unsafe {
@@ -109,7 +107,7 @@ impl IRInterpreterValue {
     pub fn into_u32(&self) -> u32 {
         union U {
             val: u32,
-            bytes: [u8; 4]
+            bytes: [u8; 4],
         }
 
         unsafe {
@@ -124,7 +122,7 @@ impl IRInterpreterValue {
     pub fn into_i32(&self) -> i32 {
         union U {
             val: i32,
-            bytes: [u8; 4]
+            bytes: [u8; 4],
         }
 
         unsafe {
@@ -139,7 +137,7 @@ impl IRInterpreterValue {
     pub fn into_u64(&self) -> u64 {
         union U {
             val: u64,
-            bytes: [u8; 8]
+            bytes: [u8; 8],
         }
 
         unsafe {
@@ -154,7 +152,7 @@ impl IRInterpreterValue {
     pub fn into_i64(&self) -> i64 {
         union U {
             val: i64,
-            bytes: [u8; 8]
+            bytes: [u8; 8],
         }
 
         unsafe {
@@ -169,12 +167,12 @@ impl IRInterpreterValue {
 
 struct IRInterpreterStack {
     values: Vec<IRInterpreterValue>,
-    frames: Vec<usize>
+    frames: Vec<usize>,
 }
 
 pub struct IRInterpreter {
     functions: HashMap<Symbol, IRItemFunctionDef>,
-    stack: IRInterpreterStack
+    stack: IRInterpreterStack,
 }
 
 impl IRInterpreter {
@@ -183,8 +181,8 @@ impl IRInterpreter {
             functions: HashMap::new(),
             stack: IRInterpreterStack {
                 values: vec![],
-                frames: vec![]
-            }
+                frames: vec![],
+            },
         }
     }
 
@@ -198,7 +196,11 @@ impl IRInterpreter {
         }
     }
 
-    pub unsafe fn call_function(&mut self, function_name: Symbol, args: &[IRInterpreterValue]) -> IRInterpreterValue {
+    pub unsafe fn call_function(
+        &mut self,
+        function_name: Symbol,
+        args: &[IRInterpreterValue],
+    ) -> IRInterpreterValue {
         let function_def = &self.functions[&function_name];
         let computations_offset = args.len();
         let comps_len = function_def.comps.len();
@@ -225,15 +227,13 @@ impl IRInterpreter {
             values[computations_offset + current_comp] = match &comp.kind {
                 IRCompKind::FunctionCall(function_call) => {
                     let name = function_call.name;
-                    let args = function_call.args
+                    let args = function_call
+                        .args
                         .iter()
                         .map(|irv| values[irv.index as usize].clone())
                         .collect::<Vec<_>>();
 
-                    self.call_function(
-                        name,
-                        &args
-                    )
+                    self.call_function(name, &args)
                 }
                 IRCompKind::BinaryOperation(operation) => {
                     let left_operand = &values[operation.left_operand.index as usize];
@@ -244,81 +244,256 @@ impl IRInterpreter {
                     if size == left_operand.bytes.len() {
                         match size {
                             1 => match operation.kind {
-                                IRCompBinaryOperationKind::Plus => IRInterpreterValue::from_u8(left_operand.into_u8().wrapping_add(right_operand.into_u8())),
-                                IRCompBinaryOperationKind::Minus => IRInterpreterValue::from_u8(left_operand.into_u8().wrapping_sub(right_operand.into_u8())),
-                                IRCompBinaryOperationKind::Mul => IRInterpreterValue::from_u8(left_operand.into_u8().wrapping_mul(right_operand.into_u8())),
-                                IRCompBinaryOperationKind::Div => IRInterpreterValue::from_u8(left_operand.into_u8().wrapping_div(right_operand.into_u8())),
-                                IRCompBinaryOperationKind::Mod => IRInterpreterValue::from_u8(left_operand.into_u8().rem(right_operand.into_u8())),
-                                IRCompBinaryOperationKind::BitAnd => IRInterpreterValue::from_u8(left_operand.into_u8() & right_operand.into_u8()),
-                                IRCompBinaryOperationKind::BitOr => IRInterpreterValue::from_u8(left_operand.into_u8() | right_operand.into_u8()),
-                                IRCompBinaryOperationKind::BitRShift => IRInterpreterValue::from_u8(left_operand.into_u8() >> right_operand.into_u8()),
-                                IRCompBinaryOperationKind::BitLShift => IRInterpreterValue::from_u8(left_operand.into_u8() << right_operand.into_u8()),
-                                IRCompBinaryOperationKind::Equal => IRInterpreterValue::from_u8((left_operand.into_u8() == right_operand.into_u8()) as u8),
-                                IRCompBinaryOperationKind::NotEqual => IRInterpreterValue::from_u8((left_operand.into_u8() != right_operand.into_u8()) as u8),
-                                IRCompBinaryOperationKind::Greater => IRInterpreterValue::from_u8((left_operand.into_u8() > right_operand.into_u8()) as u8),
-                                IRCompBinaryOperationKind::Lesser => IRInterpreterValue::from_u8((left_operand.into_u8() < right_operand.into_u8()) as u8),
-                                IRCompBinaryOperationKind::GreaterEqual => IRInterpreterValue::from_u8((left_operand.into_u8() >= right_operand.into_u8()) as u8),
-                                IRCompBinaryOperationKind::LesserEqual => IRInterpreterValue::from_u8((left_operand.into_u8() <= right_operand.into_u8()) as u8),
-                            }
+                                IRCompBinaryOperationKind::Plus => IRInterpreterValue::from_u8(
+                                    left_operand.into_u8().wrapping_add(right_operand.into_u8()),
+                                ),
+                                IRCompBinaryOperationKind::Minus => IRInterpreterValue::from_u8(
+                                    left_operand.into_u8().wrapping_sub(right_operand.into_u8()),
+                                ),
+                                IRCompBinaryOperationKind::Mul => IRInterpreterValue::from_u8(
+                                    left_operand.into_u8().wrapping_mul(right_operand.into_u8()),
+                                ),
+                                IRCompBinaryOperationKind::Div => IRInterpreterValue::from_u8(
+                                    left_operand.into_u8().wrapping_div(right_operand.into_u8()),
+                                ),
+                                IRCompBinaryOperationKind::Mod => IRInterpreterValue::from_u8(
+                                    left_operand.into_u8().rem(right_operand.into_u8()),
+                                ),
+                                IRCompBinaryOperationKind::BitAnd => IRInterpreterValue::from_u8(
+                                    left_operand.into_u8() & right_operand.into_u8(),
+                                ),
+                                IRCompBinaryOperationKind::BitOr => IRInterpreterValue::from_u8(
+                                    left_operand.into_u8() | right_operand.into_u8(),
+                                ),
+                                IRCompBinaryOperationKind::BitRShift => {
+                                    IRInterpreterValue::from_u8(
+                                        left_operand.into_u8() >> right_operand.into_u8(),
+                                    )
+                                }
+                                IRCompBinaryOperationKind::BitLShift => {
+                                    IRInterpreterValue::from_u8(
+                                        left_operand.into_u8() << right_operand.into_u8(),
+                                    )
+                                }
+                                IRCompBinaryOperationKind::Equal => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u8() == right_operand.into_u8()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::NotEqual => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u8() != right_operand.into_u8()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::Greater => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u8() > right_operand.into_u8()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::Lesser => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u8() < right_operand.into_u8()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::GreaterEqual => {
+                                    IRInterpreterValue::from_u8(
+                                        (left_operand.into_u8() >= right_operand.into_u8()) as u8,
+                                    )
+                                }
+                                IRCompBinaryOperationKind::LesserEqual => {
+                                    IRInterpreterValue::from_u8(
+                                        (left_operand.into_u8() <= right_operand.into_u8()) as u8,
+                                    )
+                                }
+                            },
 
                             2 => match operation.kind {
-                                IRCompBinaryOperationKind::Plus => IRInterpreterValue::from_u16(left_operand.into_u16().wrapping_add(right_operand.into_u16())),
-                                IRCompBinaryOperationKind::Minus => IRInterpreterValue::from_u16(left_operand.into_u16().wrapping_sub(right_operand.into_u16())),
-                                IRCompBinaryOperationKind::Mul => IRInterpreterValue::from_u16(left_operand.into_u16().wrapping_mul(right_operand.into_u16())),
-                                IRCompBinaryOperationKind::Div => IRInterpreterValue::from_u16(left_operand.into_u16().wrapping_div(right_operand.into_u16())),
-                                IRCompBinaryOperationKind::Mod => IRInterpreterValue::from_u16(left_operand.into_u16().rem(right_operand.into_u16())),
-                                IRCompBinaryOperationKind::BitAnd => IRInterpreterValue::from_u16(left_operand.into_u16() & right_operand.into_u16()),
-                                IRCompBinaryOperationKind::BitOr => IRInterpreterValue::from_u16(left_operand.into_u16() | right_operand.into_u16()),
-                                IRCompBinaryOperationKind::BitRShift => IRInterpreterValue::from_u16(left_operand.into_u16() >> right_operand.into_u16()),
-                                IRCompBinaryOperationKind::BitLShift => IRInterpreterValue::from_u16(left_operand.into_u16() << right_operand.into_u16()),
-                                IRCompBinaryOperationKind::Equal => IRInterpreterValue::from_u8((left_operand.into_u16() == right_operand.into_u16()) as u8),
-                                IRCompBinaryOperationKind::NotEqual => IRInterpreterValue::from_u8((left_operand.into_u16() != right_operand.into_u16()) as u8),
-                                IRCompBinaryOperationKind::Greater => IRInterpreterValue::from_u8((left_operand.into_u16() > right_operand.into_u16()) as u8),
-                                IRCompBinaryOperationKind::Lesser => IRInterpreterValue::from_u8((left_operand.into_u16() < right_operand.into_u16()) as u8),
-                                IRCompBinaryOperationKind::GreaterEqual => IRInterpreterValue::from_u8((left_operand.into_u16() >= right_operand.into_u16()) as u8),
-                                IRCompBinaryOperationKind::LesserEqual => IRInterpreterValue::from_u8((left_operand.into_u16() <= right_operand.into_u16()) as u8),
-                            }
+                                IRCompBinaryOperationKind::Plus => IRInterpreterValue::from_u16(
+                                    left_operand
+                                        .into_u16()
+                                        .wrapping_add(right_operand.into_u16()),
+                                ),
+                                IRCompBinaryOperationKind::Minus => IRInterpreterValue::from_u16(
+                                    left_operand
+                                        .into_u16()
+                                        .wrapping_sub(right_operand.into_u16()),
+                                ),
+                                IRCompBinaryOperationKind::Mul => IRInterpreterValue::from_u16(
+                                    left_operand
+                                        .into_u16()
+                                        .wrapping_mul(right_operand.into_u16()),
+                                ),
+                                IRCompBinaryOperationKind::Div => IRInterpreterValue::from_u16(
+                                    left_operand
+                                        .into_u16()
+                                        .wrapping_div(right_operand.into_u16()),
+                                ),
+                                IRCompBinaryOperationKind::Mod => IRInterpreterValue::from_u16(
+                                    left_operand.into_u16().rem(right_operand.into_u16()),
+                                ),
+                                IRCompBinaryOperationKind::BitAnd => IRInterpreterValue::from_u16(
+                                    left_operand.into_u16() & right_operand.into_u16(),
+                                ),
+                                IRCompBinaryOperationKind::BitOr => IRInterpreterValue::from_u16(
+                                    left_operand.into_u16() | right_operand.into_u16(),
+                                ),
+                                IRCompBinaryOperationKind::BitRShift => {
+                                    IRInterpreterValue::from_u16(
+                                        left_operand.into_u16() >> right_operand.into_u16(),
+                                    )
+                                }
+                                IRCompBinaryOperationKind::BitLShift => {
+                                    IRInterpreterValue::from_u16(
+                                        left_operand.into_u16() << right_operand.into_u16(),
+                                    )
+                                }
+                                IRCompBinaryOperationKind::Equal => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u16() == right_operand.into_u16()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::NotEqual => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u16() != right_operand.into_u16()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::Greater => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u16() > right_operand.into_u16()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::Lesser => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u16() < right_operand.into_u16()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::GreaterEqual => {
+                                    IRInterpreterValue::from_u8(
+                                        (left_operand.into_u16() >= right_operand.into_u16()) as u8,
+                                    )
+                                }
+                                IRCompBinaryOperationKind::LesserEqual => {
+                                    IRInterpreterValue::from_u8(
+                                        (left_operand.into_u16() <= right_operand.into_u16()) as u8,
+                                    )
+                                }
+                            },
 
                             4 => match operation.kind {
-                                IRCompBinaryOperationKind::Plus => IRInterpreterValue::from_u32(left_operand.into_u32().wrapping_add(right_operand.into_u32())),
-                                IRCompBinaryOperationKind::Minus => IRInterpreterValue::from_u32(left_operand.into_u32().wrapping_sub(right_operand.into_u32())),
-                                IRCompBinaryOperationKind::Mul => IRInterpreterValue::from_u32(left_operand.into_u32().wrapping_mul(right_operand.into_u32())),
-                                IRCompBinaryOperationKind::Div => IRInterpreterValue::from_u32(left_operand.into_u32().wrapping_div(right_operand.into_u32())),
-                                IRCompBinaryOperationKind::Mod => IRInterpreterValue::from_u32(left_operand.into_u32().rem(right_operand.into_u32())),
-                                IRCompBinaryOperationKind::BitAnd => IRInterpreterValue::from_u32(left_operand.into_u32() & right_operand.into_u32()),
-                                IRCompBinaryOperationKind::BitOr => IRInterpreterValue::from_u32(left_operand.into_u32() | right_operand.into_u32()),
-                                IRCompBinaryOperationKind::BitRShift => IRInterpreterValue::from_u32(left_operand.into_u32() >> right_operand.into_u32()),
-                                IRCompBinaryOperationKind::BitLShift => IRInterpreterValue::from_u32(left_operand.into_u32() << right_operand.into_u32()),
-                                IRCompBinaryOperationKind::Equal => IRInterpreterValue::from_u8((left_operand.into_u32() == right_operand.into_u32()) as u8),
-                                IRCompBinaryOperationKind::NotEqual => IRInterpreterValue::from_u8((left_operand.into_u32() != right_operand.into_u32()) as u8),
-                                IRCompBinaryOperationKind::Greater => IRInterpreterValue::from_u8((left_operand.into_u32() > right_operand.into_u32()) as u8),
-                                IRCompBinaryOperationKind::Lesser => IRInterpreterValue::from_u8((left_operand.into_u32() < right_operand.into_u32()) as u8),
-                                IRCompBinaryOperationKind::GreaterEqual => IRInterpreterValue::from_u8((left_operand.into_u32() >= right_operand.into_u32()) as u8),
-                                IRCompBinaryOperationKind::LesserEqual => IRInterpreterValue::from_u8((left_operand.into_u32() <= right_operand.into_u32()) as u8),
-                            }
+                                IRCompBinaryOperationKind::Plus => IRInterpreterValue::from_u32(
+                                    left_operand
+                                        .into_u32()
+                                        .wrapping_add(right_operand.into_u32()),
+                                ),
+                                IRCompBinaryOperationKind::Minus => IRInterpreterValue::from_u32(
+                                    left_operand
+                                        .into_u32()
+                                        .wrapping_sub(right_operand.into_u32()),
+                                ),
+                                IRCompBinaryOperationKind::Mul => IRInterpreterValue::from_u32(
+                                    left_operand
+                                        .into_u32()
+                                        .wrapping_mul(right_operand.into_u32()),
+                                ),
+                                IRCompBinaryOperationKind::Div => IRInterpreterValue::from_u32(
+                                    left_operand
+                                        .into_u32()
+                                        .wrapping_div(right_operand.into_u32()),
+                                ),
+                                IRCompBinaryOperationKind::Mod => IRInterpreterValue::from_u32(
+                                    left_operand.into_u32().rem(right_operand.into_u32()),
+                                ),
+                                IRCompBinaryOperationKind::BitAnd => IRInterpreterValue::from_u32(
+                                    left_operand.into_u32() & right_operand.into_u32(),
+                                ),
+                                IRCompBinaryOperationKind::BitOr => IRInterpreterValue::from_u32(
+                                    left_operand.into_u32() | right_operand.into_u32(),
+                                ),
+                                IRCompBinaryOperationKind::BitRShift => {
+                                    IRInterpreterValue::from_u32(
+                                        left_operand.into_u32() >> right_operand.into_u32(),
+                                    )
+                                }
+                                IRCompBinaryOperationKind::BitLShift => {
+                                    IRInterpreterValue::from_u32(
+                                        left_operand.into_u32() << right_operand.into_u32(),
+                                    )
+                                }
+                                IRCompBinaryOperationKind::Equal => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u32() == right_operand.into_u32()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::NotEqual => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u32() != right_operand.into_u32()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::Greater => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u32() > right_operand.into_u32()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::Lesser => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u32() < right_operand.into_u32()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::GreaterEqual => {
+                                    IRInterpreterValue::from_u8(
+                                        (left_operand.into_u32() >= right_operand.into_u32()) as u8,
+                                    )
+                                }
+                                IRCompBinaryOperationKind::LesserEqual => {
+                                    IRInterpreterValue::from_u8(
+                                        (left_operand.into_u32() <= right_operand.into_u32()) as u8,
+                                    )
+                                }
+                            },
 
                             8 => match operation.kind {
-                                IRCompBinaryOperationKind::Plus => IRInterpreterValue::from_u64(left_operand.into_u64().wrapping_add(right_operand.into_u64())),
-                                IRCompBinaryOperationKind::Minus => IRInterpreterValue::from_u64(left_operand.into_u64().wrapping_sub(right_operand.into_u64())),
-                                IRCompBinaryOperationKind::Mul => IRInterpreterValue::from_u64(left_operand.into_u64().wrapping_mul(right_operand.into_u64())),
-                                IRCompBinaryOperationKind::Div => IRInterpreterValue::from_u64(left_operand.into_u64().wrapping_div(right_operand.into_u64())),
-                                IRCompBinaryOperationKind::Mod => IRInterpreterValue::from_u64(left_operand.into_u64().rem(right_operand.into_u64())),
-                                IRCompBinaryOperationKind::BitAnd => IRInterpreterValue::from_u64(left_operand.into_u64() & right_operand.into_u64()),
-                                IRCompBinaryOperationKind::BitOr => IRInterpreterValue::from_u64(left_operand.into_u64() | right_operand.into_u64()),
-                                IRCompBinaryOperationKind::BitRShift => IRInterpreterValue::from_u64(left_operand.into_u64() >> right_operand.into_u64()),
-                                IRCompBinaryOperationKind::BitLShift => IRInterpreterValue::from_u64(left_operand.into_u64() << right_operand.into_u64()),
-                                IRCompBinaryOperationKind::Equal => IRInterpreterValue::from_u8((left_operand.into_u64() == right_operand.into_u64()) as u8),
-                                IRCompBinaryOperationKind::NotEqual => IRInterpreterValue::from_u8((left_operand.into_u64() != right_operand.into_u64()) as u8),
-                                IRCompBinaryOperationKind::Greater => IRInterpreterValue::from_u8((left_operand.into_u64() > right_operand.into_u64()) as u8),
-                                IRCompBinaryOperationKind::Lesser => IRInterpreterValue::from_u8((left_operand.into_u64() < right_operand.into_u64()) as u8),
-                                IRCompBinaryOperationKind::GreaterEqual => IRInterpreterValue::from_u8((left_operand.into_u64() >= right_operand.into_u64()) as u8),
-                                IRCompBinaryOperationKind::LesserEqual => IRInterpreterValue::from_u8((left_operand.into_u64() <= right_operand.into_u64()) as u8),
-                            }
+                                IRCompBinaryOperationKind::Plus => IRInterpreterValue::from_u64(
+                                    left_operand
+                                        .into_u64()
+                                        .wrapping_add(right_operand.into_u64()),
+                                ),
+                                IRCompBinaryOperationKind::Minus => IRInterpreterValue::from_u64(
+                                    left_operand
+                                        .into_u64()
+                                        .wrapping_sub(right_operand.into_u64()),
+                                ),
+                                IRCompBinaryOperationKind::Mul => IRInterpreterValue::from_u64(
+                                    left_operand
+                                        .into_u64()
+                                        .wrapping_mul(right_operand.into_u64()),
+                                ),
+                                IRCompBinaryOperationKind::Div => IRInterpreterValue::from_u64(
+                                    left_operand
+                                        .into_u64()
+                                        .wrapping_div(right_operand.into_u64()),
+                                ),
+                                IRCompBinaryOperationKind::Mod => IRInterpreterValue::from_u64(
+                                    left_operand.into_u64().rem(right_operand.into_u64()),
+                                ),
+                                IRCompBinaryOperationKind::BitAnd => IRInterpreterValue::from_u64(
+                                    left_operand.into_u64() & right_operand.into_u64(),
+                                ),
+                                IRCompBinaryOperationKind::BitOr => IRInterpreterValue::from_u64(
+                                    left_operand.into_u64() | right_operand.into_u64(),
+                                ),
+                                IRCompBinaryOperationKind::BitRShift => {
+                                    IRInterpreterValue::from_u64(
+                                        left_operand.into_u64() >> right_operand.into_u64(),
+                                    )
+                                }
+                                IRCompBinaryOperationKind::BitLShift => {
+                                    IRInterpreterValue::from_u64(
+                                        left_operand.into_u64() << right_operand.into_u64(),
+                                    )
+                                }
+                                IRCompBinaryOperationKind::Equal => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u64() == right_operand.into_u64()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::NotEqual => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u64() != right_operand.into_u64()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::Greater => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u64() > right_operand.into_u64()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::Lesser => IRInterpreterValue::from_u8(
+                                    (left_operand.into_u64() < right_operand.into_u64()) as u8,
+                                ),
+                                IRCompBinaryOperationKind::GreaterEqual => {
+                                    IRInterpreterValue::from_u8(
+                                        (left_operand.into_u64() >= right_operand.into_u64()) as u8,
+                                    )
+                                }
+                                IRCompBinaryOperationKind::LesserEqual => {
+                                    IRInterpreterValue::from_u8(
+                                        (left_operand.into_u64() <= right_operand.into_u64()) as u8,
+                                    )
+                                }
+                            },
 
-                            _ => IRInterpreterValue::void()
+                            _ => IRInterpreterValue::void(),
                         }
-                    }
-                    else {
+                    } else {
                         IRInterpreterValue::void()
                     }
                 }
@@ -329,33 +504,45 @@ impl IRInterpreter {
 
                     match size {
                         1 => match operation.kind {
-                            IRCompUnaryOperationKind::BoolNot => IRInterpreterValue::from_u8(if operand.into_u8() == 0 { 1 } else { 0 }),
-                            IRCompUnaryOperationKind::SignedNegation => IRInterpreterValue::from_i8(-operand.into_i8())
-                        }
+                            IRCompUnaryOperationKind::BoolNot => {
+                                IRInterpreterValue::from_u8(if operand.into_u8() == 0 {
+                                    1
+                                } else {
+                                    0
+                                })
+                            }
+                            IRCompUnaryOperationKind::SignedNegation => {
+                                IRInterpreterValue::from_i8(-operand.into_i8())
+                            }
+                        },
 
                         2 => match operation.kind {
                             IRCompUnaryOperationKind::BoolNot => IRInterpreterValue::void(),
-                            IRCompUnaryOperationKind::SignedNegation => IRInterpreterValue::from_i16(-operand.into_i16())
-                        }
+                            IRCompUnaryOperationKind::SignedNegation => {
+                                IRInterpreterValue::from_i16(-operand.into_i16())
+                            }
+                        },
 
                         4 => match operation.kind {
                             IRCompUnaryOperationKind::BoolNot => IRInterpreterValue::void(),
-                            IRCompUnaryOperationKind::SignedNegation => IRInterpreterValue::from_i32(-operand.into_i32())
-                        }
+                            IRCompUnaryOperationKind::SignedNegation => {
+                                IRInterpreterValue::from_i32(-operand.into_i32())
+                            }
+                        },
 
                         8 => match operation.kind {
                             IRCompUnaryOperationKind::BoolNot => IRInterpreterValue::void(),
-                            IRCompUnaryOperationKind::SignedNegation => IRInterpreterValue::from_i64(-operand.into_i64())
-                        }
+                            IRCompUnaryOperationKind::SignedNegation => {
+                                IRInterpreterValue::from_i64(-operand.into_i64())
+                            }
+                        },
 
-                        _ => IRInterpreterValue::void()
+                        _ => IRInterpreterValue::void(),
                     }
                 }
-                IRCompKind::Constant(constant) => {
-                    IRInterpreterValue {
-                        bytes: constant.bytes.clone()
-                    }
-                }
+                IRCompKind::Constant(constant) => IRInterpreterValue {
+                    bytes: constant.bytes.clone(),
+                },
                 IRCompKind::Alloc(ir_type) => {
                     *self.stack.frames.last_mut().unwrap() += 1;
 
@@ -380,7 +567,7 @@ impl IRInterpreter {
                     let slice = std::slice::from_raw_parts(ptr, ir_type.size as usize);
 
                     IRInterpreterValue {
-                        bytes: slice.to_vec()
+                        bytes: slice.to_vec(),
                     }
                 }
                 IRCompKind::OffsetStore(ir_type, location, value, offset) => {
@@ -398,7 +585,7 @@ impl IRInterpreter {
                     let slice = std::slice::from_raw_parts(ptr, ir_type.size as usize);
 
                     IRInterpreterValue {
-                        bytes: slice.to_vec()
+                        bytes: slice.to_vec(),
                     }
                 }
                 IRCompKind::Return(value) => {
@@ -429,8 +616,7 @@ impl IRInterpreter {
 
             if !performed_jump {
                 current_comp += 1;
-            }
-            else {
+            } else {
                 current_comp = target_comp;
             }
         }

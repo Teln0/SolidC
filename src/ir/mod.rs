@@ -8,20 +8,20 @@ pub mod interpreter;
 #[derive(Debug, Clone)]
 pub struct IRType {
     pub size: u64,
-    pub align: u64
+    pub align: u64,
 }
 
 #[derive(Debug, Clone)]
 pub struct IRValue {
     /// First indexes correspond to parameters, following indexes correspond to locals
-    pub index: u64
+    pub index: u64,
 }
 
 pub struct IRItemFunctionDef {
     pub name: Symbol,
     pub return_type: IRType,
     pub params: Vec<IRType>,
-    pub comps: Vec<IRComp>
+    pub comps: Vec<IRComp>,
 }
 
 pub enum IRItemKind {
@@ -29,9 +29,9 @@ pub enum IRItemKind {
 }
 
 pub struct IRItem {
-    pub kind: IRItemKind
+    pub kind: IRItemKind,
 }
 
 pub struct IRModule {
-    pub items: Vec<IRItem>
+    pub items: Vec<IRItem>,
 }

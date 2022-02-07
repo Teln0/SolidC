@@ -4,7 +4,7 @@ const EOF_CHAR: char = '\0';
 
 struct LexerCursor<'a> {
     initial_len: usize,
-    chars: Chars<'a>
+    chars: Chars<'a>,
 }
 
 impl<'a> LexerCursor<'a> {
@@ -31,15 +31,12 @@ impl<'a> LexerCursor<'a> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum TokenKind {
     // Identifiers
-
     Ident,
 
     // Literals
-
     IntegerLiteral,
 
     // Keywords
-
     KwFn,
     KwStruct,
     KwTemplate,
@@ -55,7 +52,6 @@ pub enum TokenKind {
     KwContinue,
 
     // Punctuation
-
     Semicolon,
     Colon,
     ColonColon,
@@ -65,7 +61,6 @@ pub enum TokenKind {
     LTurbofish,
 
     // Parentheses and brackets
-
     LParen,
     RParen,
     LSBracket,
@@ -76,7 +71,6 @@ pub enum TokenKind {
     RABracket,
 
     // Assignment & operators
-
     Assign,
 
     Plus,
@@ -103,19 +97,19 @@ pub enum TokenKind {
     // Special tokens
     EOF,
     Whitespace,
-    Error
+    Error,
 }
 
 struct ThinToken {
     kind: TokenKind,
-    len: usize
+    len: usize,
 }
 
 #[derive(Debug)]
 pub struct Token {
     pub kind: TokenKind,
     pub start: usize,
-    pub len: usize
+    pub len: usize,
 }
 
 fn is_valid_ident_char<const FIRST: bool>(c: char) -> bool {
@@ -127,17 +121,19 @@ fn first_token(src: &str) -> ThinToken {
 
     let kind = match cursor.bump() {
         ';' => TokenKind::Semicolon,
-        ':' => if cursor.nth(0) == ':' {
-            cursor.bump();
-            if cursor.nth(0) == '<' {
+        ':' => {
+            if cursor.nth(0) == ':' {
                 cursor.bump();
-                TokenKind::LTurbofish
-            }
-            else {
-                TokenKind::ColonColon
+                if cursor.nth(0) == '<' {
+                    cursor.bump();
+                    TokenKind::LTurbofish
+                } else {
+                    TokenKind::ColonColon
+                }
+            } else {
+                TokenKind::Colon
             }
         }
-        else { TokenKind::Colon }
         '.' => TokenKind::Dot,
         ',' => TokenKind::Comma,
 
@@ -147,29 +143,79 @@ fn first_token(src: &str) -> ThinToken {
         ']' => TokenKind::RSBracket,
         '{' => TokenKind::LCBracket,
         '}' => TokenKind::RCBracket,
-        '<' => if cursor.nth(0) == '~' { cursor.bump(); TokenKind::BitLShift }
-        else if cursor.nth(0) == '=' { cursor.bump(); TokenKind::LesserEqual }
-        else { TokenKind::LABracket },
-        '>' => if cursor.nth(0) == '=' { cursor.bump(); TokenKind::GreaterEqual }
-        else { TokenKind::RABracket },
+        '<' => {
+            if cursor.nth(0) == '~' {
+                cursor.bump();
+                TokenKind::BitLShift
+            } else if cursor.nth(0) == '=' {
+                cursor.bump();
+                TokenKind::LesserEqual
+            } else {
+                TokenKind::LABracket
+            }
+        }
+        '>' => {
+            if cursor.nth(0) == '=' {
+                cursor.bump();
+                TokenKind::GreaterEqual
+            } else {
+                TokenKind::RABracket
+            }
+        }
 
-        '=' => if cursor.nth(0) == '=' { cursor.bump(); TokenKind::Equal }
-        else { TokenKind::Assign }
+        '=' => {
+            if cursor.nth(0) == '=' {
+                cursor.bump();
+                TokenKind::Equal
+            } else {
+                TokenKind::Assign
+            }
+        }
         '+' => TokenKind::Plus,
-        '-' => if cursor.nth(0) == '>' { cursor.bump(); TokenKind::Arrow }
-        else { TokenKind::Minus }
+        '-' => {
+            if cursor.nth(0) == '>' {
+                cursor.bump();
+                TokenKind::Arrow
+            } else {
+                TokenKind::Minus
+            }
+        }
         '*' => TokenKind::Mul,
         '/' => TokenKind::Div,
         '%' => TokenKind::Mod,
 
-        '&' => if cursor.nth(0) == '&' { cursor.bump(); TokenKind::BoolAnd }
-        else { TokenKind::BitAnd }
-        '|' => if cursor.nth(0) == '|' { cursor.bump(); TokenKind::BoolOr }
-        else { TokenKind::BitOr }
-        '~' => if cursor.nth(0) == '>' { cursor.bump(); TokenKind::BitRShift }
-        else { TokenKind::BitNot },
-        '!' => if cursor.nth(0) == '=' { cursor.bump(); TokenKind::NotEqual }
-        else { TokenKind::BoolNot },
+        '&' => {
+            if cursor.nth(0) == '&' {
+                cursor.bump();
+                TokenKind::BoolAnd
+            } else {
+                TokenKind::BitAnd
+            }
+        }
+        '|' => {
+            if cursor.nth(0) == '|' {
+                cursor.bump();
+                TokenKind::BoolOr
+            } else {
+                TokenKind::BitOr
+            }
+        }
+        '~' => {
+            if cursor.nth(0) == '>' {
+                cursor.bump();
+                TokenKind::BitRShift
+            } else {
+                TokenKind::BitNot
+            }
+        }
+        '!' => {
+            if cursor.nth(0) == '=' {
+                cursor.bump();
+                TokenKind::NotEqual
+            } else {
+                TokenKind::BoolNot
+            }
+        }
 
         c if is_valid_ident_char::<true>(c) => {
             while is_valid_ident_char::<false>(cursor.nth(0)) {
@@ -190,7 +236,7 @@ fn first_token(src: &str) -> ThinToken {
                 "return" => TokenKind::KwReturn,
                 "break" => TokenKind::KwBreak,
                 "continue" => TokenKind::KwContinue,
-                _ => TokenKind::Ident
+                _ => TokenKind::Ident,
             }
         }
         EOF_CHAR => TokenKind::EOF,
@@ -206,12 +252,12 @@ fn first_token(src: &str) -> ThinToken {
             }
             TokenKind::Whitespace
         }
-        _ => TokenKind::Error
+        _ => TokenKind::Error,
     };
 
     ThinToken {
         kind,
-        len: cursor.consumed()
+        len: cursor.consumed(),
     }
 }
 
@@ -223,15 +269,19 @@ pub fn lex(mut src: &str) -> impl Iterator<Item = Token> + '_ {
             let start = consumed;
             consumed += token.len;
 
-            if token.kind != TokenKind::EOF { src = &src[token.len..]; }
+            if token.kind != TokenKind::EOF {
+                src = &src[token.len..];
+            }
 
             // Skip whitespace
-            if token.kind == TokenKind::Whitespace { continue; }
+            if token.kind == TokenKind::Whitespace {
+                continue;
+            }
 
             break Token {
                 kind: token.kind,
                 len: token.len,
-                start
+                start,
             };
         })
     })

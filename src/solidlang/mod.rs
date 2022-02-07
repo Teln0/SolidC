@@ -1,5 +1,6 @@
 pub mod ast;
+pub mod context;
 pub mod lexer;
+pub mod lowerer;
 pub mod parser;
 pub mod span;
-pub mod tir;

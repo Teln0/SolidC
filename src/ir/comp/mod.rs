@@ -4,7 +4,7 @@ use crate::ir::{IRType, IRValue};
 #[derive(Debug, Clone)]
 pub struct IRCompFunctionCall {
     pub name: Symbol,
-    pub args: Vec<IRValue>
+    pub args: Vec<IRValue>,
 }
 
 #[derive(Debug, Clone)]
@@ -32,24 +32,24 @@ pub enum IRCompBinaryOperationKind {
 pub struct IRCompBinaryOperation {
     pub kind: IRCompBinaryOperationKind,
     pub left_operand: IRValue,
-    pub right_operand: IRValue
+    pub right_operand: IRValue,
 }
 
 #[derive(Debug, Clone)]
 pub enum IRCompUnaryOperationKind {
     BoolNot,
-    SignedNegation
+    SignedNegation,
 }
 
 #[derive(Debug, Clone)]
 pub struct IRCompUnaryOperation {
     pub kind: IRCompUnaryOperationKind,
-    pub operand: IRValue
+    pub operand: IRValue,
 }
 
 #[derive(Debug, Clone)]
 pub struct IRCompConstant {
-    pub bytes: Vec<u8>
+    pub bytes: Vec<u8>,
 }
 
 #[derive(Debug, Clone)]
@@ -77,10 +77,10 @@ pub enum IRCompKind {
     /// Yields nothing, jumps to the location if the value is true
     If(IRValue, u64),
     /// Yields nothing, jumps to the location
-    Jmp(u64)
+    Jmp(u64),
 }
 
 #[derive(Debug, Clone)]
 pub struct IRComp {
-    pub kind: IRCompKind
+    pub kind: IRCompKind,
 }

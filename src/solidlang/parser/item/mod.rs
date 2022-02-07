@@ -3,7 +3,7 @@ use crate::solidlang::lexer::{Token, TokenKind};
 use crate::solidlang::parser::{Parser, ParserResult};
 
 impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
-    pub (in crate::solidlang::parser) fn parse_item(&mut self) -> ParserResult<ASTItem> {
+    pub(in crate::solidlang::parser) fn parse_item(&mut self) -> ParserResult<ASTItem> {
         self.start_span();
 
         if self.check(TokenKind::KwFn) {
@@ -20,16 +20,14 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
                     params.push(self.parse_name_and_type()?);
                 }
                 self.expect(TokenKind::RParen)?;
-            }
-            else {
+            } else {
                 self.advance();
             }
 
             let return_type = if self.check(TokenKind::Arrow) {
                 self.advance();
                 Some(self.parse_type()?)
-            }
-            else {
+            } else {
                 None
             };
 
@@ -41,9 +39,9 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
                     return_type,
                     params,
                     statement_block,
-                    span: self.close_span()
-                })
-            })
+                    span: self.close_span(),
+                }),
+            });
         }
 
         if self.check(TokenKind::KwStruct) {
@@ -61,8 +59,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
                     fields.push(self.parse_name_and_type()?);
                 }
                 self.expect(TokenKind::RCBracket)?;
-            }
-            else {
+            } else {
                 self.advance();
             }
 
@@ -70,8 +67,8 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
                 kind: ASTItemKind::StructDef(ASTStructDef {
                     name,
                     fields,
-                    span: self.close_span()
-                })
+                    span: self.close_span(),
+                }),
             });
         }
 
@@ -91,8 +88,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
                 self.advance();
                 items = self.parse_items(TokenKind::RCBracket)?;
                 self.advance();
-            }
-            else {
+            } else {
                 items = vec![self.parse_item()?];
             }
 
@@ -100,15 +96,18 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
                 kind: ASTItemKind::Template(ASTTemplate {
                     params,
                     items,
-                    span: self.close_span()
-                })
+                    span: self.close_span(),
+                }),
             });
         }
 
         Err(self.error_unexpected_current())
     }
 
-    pub (in crate::solidlang::parser) fn parse_items(&mut self, closing_delim: TokenKind) -> ParserResult<Vec<ASTItem>> {
+    pub(in crate::solidlang::parser) fn parse_items(
+        &mut self,
+        closing_delim: TokenKind,
+    ) -> ParserResult<Vec<ASTItem>> {
         let mut items = vec![];
         while !self.check(closing_delim) {
             items.push(self.parse_item()?);

@@ -1,9 +1,9 @@
-use std::iter::Peekable;
-use backtrace::Backtrace;
 use crate::globals::{SessionGlobals, Symbol};
 use crate::solidlang::ast::ASTModule;
 use crate::solidlang::lexer::{Token, TokenKind};
 use crate::solidlang::span::Span;
+use backtrace::Backtrace;
+use std::iter::Peekable;
 
 pub mod asttype;
 pub mod expression;
@@ -14,14 +14,14 @@ pub mod statement;
 pub enum ParserErrorKind {
     UnexpectedToken {
         expected: Vec<TokenKind>,
-        got: TokenKind
-    }
+        got: TokenKind,
+    },
 }
 
 #[derive(Debug)]
 pub struct ParserError {
     pub kind: ParserErrorKind,
-    pub backtrace: Backtrace
+    pub backtrace: Backtrace,
 }
 
 pub type ParserResult<T> = Result<T, ParserError>;
@@ -31,7 +31,7 @@ pub struct Parser<'a, T: Iterator<Item = Token>> {
     expected_tokens: Vec<TokenKind>,
     src: &'a str,
     span_starts: Vec<usize>,
-    ending_span: usize
+    ending_span: usize,
 }
 
 impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
@@ -41,7 +41,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
             expected_tokens: vec![],
             src,
             span_starts: vec![],
-            ending_span: 0
+            ending_span: 0,
         }
     }
 
@@ -66,9 +66,9 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
         ParserError {
             kind: ParserErrorKind::UnexpectedToken {
                 got,
-                expected: self.expected_tokens.clone()
+                expected: self.expected_tokens.clone(),
             },
-            backtrace: Backtrace::new()
+            backtrace: Backtrace::new(),
         }
     }
 
@@ -80,8 +80,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
     fn expect(&mut self, kind: TokenKind) -> ParserResult<Token> {
         if self.check(kind) {
             Ok(self.advance())
-        }
-        else {
+        } else {
             Err(self.error_unexpected_current())
         }
     }
@@ -89,11 +88,9 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
     fn advance_symbol(&mut self) -> Symbol {
         let token = self.advance();
         SessionGlobals::with_interner_mut(|interner| {
-            if token.kind == TokenKind::EOF
-                || token.kind == TokenKind::Error {
+            if token.kind == TokenKind::EOF || token.kind == TokenKind::Error {
                 interner.intern("")
-            }
-            else {
+            } else {
                 let str = &self.src[token.start..(token.start + token.len)];
                 interner.intern(str)
             }
@@ -103,8 +100,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
     fn expect_symbol(&mut self, kind: TokenKind) -> ParserResult<Symbol> {
         if self.check(kind) {
             Ok(self.advance_symbol())
-        }
-        else {
+        } else {
             Err(self.error_unexpected_current())
         }
     }
@@ -127,7 +123,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
         let start = self.span_starts.pop().unwrap();
         Span {
             start,
-            len: self.ending_span - start
+            len: self.ending_span - start,
         }
     }
 
@@ -137,7 +133,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
 
         let result = Ok(ASTModule {
             items,
-            span: self.close_span()
+            span: self.close_span(),
         });
 
         if !self.span_starts.is_empty() {
