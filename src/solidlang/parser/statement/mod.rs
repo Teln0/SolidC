@@ -107,7 +107,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
                 let peeked = self.peek();
                 Span {
                     start: peeked.start,
-                    len: peeked.len
+                    len: peeked.len,
                 }
             };
 
@@ -119,7 +119,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
                 if semi_present {
                     statements.push(ASTStatement {
                         kind: ASTStatementKind::Semicolon,
-                        span: semi_span
+                        span: semi_span,
                     });
                 }
                 break;

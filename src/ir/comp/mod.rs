@@ -38,6 +38,7 @@ pub struct IRCompBinaryOperation {
 #[derive(Debug, Clone)]
 pub enum IRCompUnaryOperationKind {
     BoolNot,
+    BitNot,
     SignedNegation,
 }
 
@@ -75,12 +76,13 @@ pub enum IRCompKind {
     /// Yields nothing, returns from the function with the value
     Return(IRValue),
     /// Yields nothing, jumps to the location if the value is true
-    If(IRValue, u64),
+    If(IRValue, Symbol),
     /// Yields nothing, jumps to the location
-    Jmp(u64),
+    Jmp(Symbol),
 }
 
 #[derive(Debug, Clone)]
 pub struct IRComp {
     pub kind: IRCompKind,
+    pub id: Option<Symbol>,
 }

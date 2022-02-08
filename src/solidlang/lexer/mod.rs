@@ -35,6 +35,8 @@ pub enum TokenKind {
 
     // Literals
     IntegerLiteral,
+    BooleanTrue,
+    BooleanFalse,
 
     // Keywords
     KwFn,
@@ -223,6 +225,8 @@ fn first_token(src: &str) -> ThinToken {
             }
 
             match &src[..cursor.consumed()] {
+                "true" => TokenKind::BooleanTrue,
+                "false" => TokenKind::BooleanFalse,
                 "fn" => TokenKind::KwFn,
                 "struct" => TokenKind::KwStruct,
                 "template" => TokenKind::KwTemplate,

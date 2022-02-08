@@ -1,34 +1,37 @@
-fn fib: (1 1) -> (1 1)
-    ; Seq numbers
-    alloc (2 1) ;                  %1
+fn fib: %iterations := (1 1) -> (1 1)
+    %constant_1 := const 1 1
+    %constant_0 := const 1 0
 
-    ; Iterator
-    alloc (1 1) ;                  %2
+    %sequence_numbers := alloc (2 1)
+    %iterator := alloc (1 1)
 
-    ; Initialization
-    const 1 0 ;                    %3
-    const 1 1 ;                    %4
-    offsetstore (1 1) %1 %3 0 ;    %5
-    offsetstore (1 1) %1 %4 1 ;    %6
-    store (1 1) %2 %3 ;            %7
+    offsetstore (1 1) %sequence_numbers %constant_1 1
+    offsetstore (1 1) %sequence_numbers %constant_0 0
+    store (1 1) %iterator %constant_0
 
-    ; While start
-    load (1 1) %2 ;                %8
-    binop == %8 %0 ;               %9
-    if %9 18 ;                     %10
+    ; While condition
+    :while_condition
 
-    binop + %8 %4 ;                %11
-    store (1 1) %2 %11 ;           %12
+    %i := load (1 1) %iterator
+    %comparison := binop >= %i %iterations
+    if %comparison while_end
 
-    offsetload (1 1) %1 0 ;        %13
-    offsetload (1 1) %1 1 ;        %14
-    binop + %13 %14 ;              %15
+    ; While body
 
-    offsetstore (1 1) %1 %14 0 ;   %16
-    offsetstore (1 1) %1 %15 1 ;   %17
-    jmp 7 ;                        %18
+    %a := offsetload (1 1) %sequence_numbers 0
+    %b := offsetload (1 1) %sequence_numbers 1
+    %c := binop + %a %b
+    offsetstore (1 1) %sequence_numbers %b 0
+    offsetstore (1 1) %sequence_numbers %c 1
+
+    %iplusplus := binop + %i %constant_1
+    store (1 1) %iterator %iplusplus
+
+    jmp while_condition
+
     ; While end
+    :while_end
 
-    offsetload (1 1) %1 0 ;        %19
-    return %19 ;                   %20
+    %result := offsetload (1 1) %sequence_numbers 1
+    return %result
 endfn

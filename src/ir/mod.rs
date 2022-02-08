@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::globals::Symbol;
 use crate::ir::comp::IRComp;
 
@@ -13,15 +14,15 @@ pub struct IRType {
 
 #[derive(Debug, Clone)]
 pub struct IRValue {
-    /// First indexes correspond to parameters, following indexes correspond to locals
-    pub index: u64,
+    pub id: Symbol,
 }
 
 pub struct IRItemFunctionDef {
     pub name: Symbol,
     pub return_type: IRType,
-    pub params: Vec<IRType>,
+    pub params: Vec<(Option<Symbol>, IRType)>,
     pub comps: Vec<IRComp>,
+    pub label_defs: HashMap<Symbol, u64>
 }
 
 pub enum IRItemKind {

@@ -1,4 +1,5 @@
-use crate::globals::SessionGlobals;
+use std::collections::HashMap;
+use crate::globals::{SessionGlobals, Symbol};
 use crate::ir::comp::{
     IRComp, IRCompBinaryOperation, IRCompBinaryOperationKind, IRCompConstant, IRCompFunctionCall,
     IRCompKind, IRCompUnaryOperation, IRCompUnaryOperationKind,
@@ -84,7 +85,14 @@ impl<'a> IRAsssmblyLexerCursor<'a> {
 
         let kind = match self.bump() {
             '%' => IRAssemblyTokenKind::Percent,
-            ':' => IRAssemblyTokenKind::Colon,
+            ':' => {
+                if self.nth(0) == '=' {
+                    self.bump();
+                    IRAssemblyTokenKind::Assign
+                } else {
+                    IRAssemblyTokenKind::Colon
+                }
+            }
             '-' if self.nth(0) == '>' => {
                 self.bump();
                 IRAssemblyTokenKind::Arrow
@@ -121,6 +129,7 @@ enum IRAssemblyTokenKind {
     Percent,
     Colon,
     Arrow,
+    Assign,
     LParen,
     RParen,
 
@@ -280,14 +289,33 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
         return Ok(IRType { size, align });
     }
 
+    fn get_symbol(&self, token: &IRAssemblyToken) -> Symbol {
+        SessionGlobals::with_interner_mut(|i| i.intern(
+            &self.src[token.start..(token.start + token.len)]
+        ))
+    }
+
     fn parse_ir_value(&mut self) -> IRAssemblerResult<IRValue> {
         self.expect_kind(IRAssemblyTokenKind::Percent)?;
+        let word = self.expect_kind(IRAssemblyTokenKind::Word)?;
         Ok(IRValue {
-            index: self.parse_integer_u64()?,
+            id: self.get_symbol(&word),
         })
     }
 
+    fn parse_id(&mut self) -> IRAssemblerResult<Option<Symbol>> {
+        if self.check_kind(IRAssemblyTokenKind::Percent) {
+            let value = self.parse_ir_value()?;
+            self.expect_kind(IRAssemblyTokenKind::Assign)?;
+            Ok(Some(value.id))
+        } else {
+            Ok(None)
+        }
+    }
+
     fn parse_ir_comp(&mut self) -> IRAssemblerResult<IRComp> {
+        let id = self.parse_id()?;
+
         if self.check_keyword("call") {
             // Function call
             self.advance_token();
@@ -306,6 +334,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
 
             return Ok(IRComp {
                 kind: IRCompKind::FunctionCall(IRCompFunctionCall { name, args }),
+                id,
             });
         }
         if self.check_keyword("binop") {
@@ -357,6 +386,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
                         left_operand,
                         right_operand,
                     }),
+                    id,
                 });
             } else {
                 return Err(self.error_unexpected());
@@ -367,9 +397,11 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
             self.advance_token();
             let mut operation_kind = None;
 
-            if self.check_keyword("not") {
+            if self.check_keyword("boolnot") {
                 operation_kind = Some(IRCompUnaryOperationKind::BoolNot)
-            } else if self.check_keyword("neg") {
+            } else if self.check_keyword("bitnot") {
+                operation_kind = Some(IRCompUnaryOperationKind::BitNot)
+            } else if self.check_keyword("signedneg") {
                 operation_kind = Some(IRCompUnaryOperationKind::SignedNegation)
             }
 
@@ -381,6 +413,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
                         kind: operation_kind,
                         operand,
                     }),
+                    id,
                 });
             } else {
                 return Err(self.error_unexpected());
@@ -398,6 +431,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
 
             return Ok(IRComp {
                 kind: IRCompKind::Constant(IRCompConstant { bytes }),
+                id,
             });
         }
         if self.check_keyword("alloc") {
@@ -407,6 +441,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
             let ir_type = self.parse_ir_type()?;
             return Ok(IRComp {
                 kind: IRCompKind::Alloc(ir_type),
+                id,
             });
         }
         if self.check_keyword("store") {
@@ -419,6 +454,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
 
             return Ok(IRComp {
                 kind: IRCompKind::Store(ir_type, location, value),
+                id,
             });
         }
         if self.check_keyword("load") {
@@ -430,6 +466,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
 
             return Ok(IRComp {
                 kind: IRCompKind::Load(ir_type, location),
+                id,
             });
         }
         if self.check_keyword("offsetstore") {
@@ -443,6 +480,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
 
             return Ok(IRComp {
                 kind: IRCompKind::OffsetStore(ir_type, location, value, offset),
+                id,
             });
         }
         if self.check_keyword("offsetload") {
@@ -455,6 +493,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
 
             return Ok(IRComp {
                 kind: IRCompKind::OffsetLoad(ir_type, location, offset),
+                id,
             });
         }
         if self.check_keyword("return") {
@@ -465,6 +504,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
 
             return Ok(IRComp {
                 kind: IRCompKind::Return(value),
+                id,
             });
         }
         if self.check_keyword("if") {
@@ -472,20 +512,22 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
             self.advance_token();
 
             let value = self.parse_ir_value()?;
-            let location = self.parse_integer_u64()?;
+            let location = self.expect_kind(IRAssemblyTokenKind::Word)?;
 
             return Ok(IRComp {
-                kind: IRCompKind::If(value, location),
+                kind: IRCompKind::If(value, self.get_symbol(&location)),
+                id,
             });
         }
         if self.check_keyword("jmp") {
             // Jump
             self.advance_token();
 
-            let location = self.parse_integer_u64()?;
+            let location = self.expect_kind(IRAssemblyTokenKind::Word)?;
 
             return Ok(IRComp {
-                kind: IRCompKind::Jmp(location),
+                kind: IRCompKind::Jmp(self.get_symbol(&location)),
+                id,
             });
         }
 
@@ -508,16 +550,28 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
                 // Params
                 let mut params = vec![];
                 while !self.check_kind(IRAssemblyTokenKind::Arrow) {
-                    params.push(self.parse_ir_type()?);
+                    let id = self.parse_id()?;
+                    let ir_type = self.parse_ir_type()?;
+                    params.push((id, ir_type));
                 }
                 self.advance_token();
 
                 let return_type = self.parse_ir_type()?;
 
-                // Computations
+                // Computations and labels
                 let mut comps = vec![];
+                let mut label_defs = HashMap::new();
                 while !self.check_keyword("endfn") {
-                    comps.push(self.parse_ir_comp()?);
+                    if self.check_kind(IRAssemblyTokenKind::Colon) {
+                        self.advance_token();
+                        let label = self.expect_kind(IRAssemblyTokenKind::Word)?;
+                        let label = self.get_symbol(&label);
+                        let current_index = comps.len() as u64;
+                        label_defs.insert(label, current_index);
+                    }
+                    else {
+                        comps.push(self.parse_ir_comp()?);
+                    }
                 }
                 self.advance_token();
 
@@ -527,6 +581,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
                         params,
                         return_type,
                         comps,
+                        label_defs
                     }),
                 });
 

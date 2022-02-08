@@ -27,7 +27,25 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
 
             return Ok(ASTExpression {
                 kind: ASTExpressionKind::IntegerLiteral(literal),
-                span: self.close_span(),
+                span: self.close_span()
+            });
+        }
+
+        if self.check(TokenKind::BooleanTrue) {
+            self.advance();
+
+            return Ok(ASTExpression {
+                kind: ASTExpressionKind::Boolean(true),
+                span: self.close_span()
+            });
+        }
+
+        if self.check(TokenKind::BooleanFalse) {
+            self.advance();
+
+            return Ok(ASTExpression {
+                kind: ASTExpressionKind::Boolean(false),
+                span: self.close_span()
             });
         }
 
@@ -39,6 +57,16 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
 
             self.close_span();
             return Ok(expression);
+        }
+
+        if self.check(TokenKind::LCBracket) {
+            // Block expressions
+            let block = self.parse_statement_block()?;
+
+            return Ok(ASTExpression {
+                kind: ASTExpressionKind::Block(block),
+                span: self.close_span()
+            });
         }
 
         if self.check(TokenKind::KwIf) {

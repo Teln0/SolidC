@@ -128,6 +128,7 @@ pub enum ASTOperator {
 pub enum ASTExpressionKind {
     Ident(Symbol),
     IntegerLiteral(u64),
+    Boolean(bool),
 
     UnaryOperation(ASTOperator, Box<ASTExpression>),
     BinaryOperation(ASTOperator, Box<ASTExpression>, Box<ASTExpression>),
@@ -140,6 +141,7 @@ pub enum ASTExpressionKind {
     While(Box<ASTExpression>, ASTStatementBlock),
     Loop(ASTStatementBlock),
     For(Symbol, Box<ASTExpression>, ASTStatementBlock),
+    Block(ASTStatementBlock),
 
     TemplateApplication(Box<ASTExpression>, Vec<ASTType>),
     Call(Box<ASTExpression>, Vec<ASTExpression>),
@@ -154,6 +156,27 @@ pub struct ASTExpression {
     pub kind: ASTExpressionKind,
 
     pub span: Span,
+}
+
+impl ASTExpression {
+    pub fn collect_static_access_path(&self) -> (Vec<Symbol>, Option<&ASTExpression>) {
+        let mut expression = self;
+        let mut path = vec![];
+        let remainder = loop {
+            match &expression.kind {
+                ASTExpressionKind::Ident(symbol) => {
+                    path.push(*symbol);
+                    break None;
+                }
+                ASTExpressionKind::StaticAccess(e, symbol) => {
+                    path.push(*symbol);
+                    expression = e;
+                }
+                _ => break Some(expression)
+            }
+        };
+        (path, remainder)
+    }
 }
 
 impl ASTStatement {

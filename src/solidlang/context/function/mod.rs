@@ -44,4 +44,13 @@ impl FunctionContext {
         self.scopes = with;
         current_scopes
     }
+
+    pub fn iter_functions(&self) -> impl Iterator<Item = &Function> {
+        let mut iter: Box<dyn Iterator<Item = &Function>> = Box::new(std::iter::empty());
+        for scope in &self.scopes {
+            iter = Box::new(iter.chain(scope.functions.iter()))
+        }
+
+        iter
+    }
 }

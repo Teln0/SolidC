@@ -36,7 +36,7 @@ pub struct TyStruct {
 pub enum TyKind {
     Primitive(TyPrimitive),
     PointerTo(Box<Ty>),
-    Struct(TyStruct),
+    Struct(TyStruct)
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -61,7 +61,13 @@ impl Ty {
                 TyPrimitive::Void => (0, 1),
             },
             TyKind::PointerTo(_) => (8, 8),
-            TyKind::Struct(s) => (s.size, s.align),
+            TyKind::Struct(s) => (s.size, s.align)
+        }
+    }
+
+    pub fn from_primitive(primitive: TyPrimitive) -> Self {
+        Ty {
+            kind: TyKind::Primitive(primitive),
         }
     }
 }

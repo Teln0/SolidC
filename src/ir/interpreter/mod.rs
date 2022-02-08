@@ -173,6 +173,7 @@ struct IRInterpreterStack {
 pub struct IRInterpreter {
     functions: HashMap<Symbol, IRItemFunctionDef>,
     stack: IRInterpreterStack,
+    label_defs: HashMap<Symbol, u64>
 }
 
 impl IRInterpreter {
@@ -183,6 +184,7 @@ impl IRInterpreter {
                 values: vec![],
                 frames: vec![],
             },
+            label_defs: HashMap::new()
         }
     }
 
@@ -190,6 +192,7 @@ impl IRInterpreter {
         for item in module.items {
             match item.kind {
                 IRItemKind::FunctionDef(function_def) => {
+                    self.label_defs.extend(function_def.label_defs.iter());
                     self.functions.insert(function_def.name, function_def);
                 }
             }
@@ -202,18 +205,15 @@ impl IRInterpreter {
         args: &[IRInterpreterValue],
     ) -> IRInterpreterValue {
         let function_def = &self.functions[&function_name];
-        let computations_offset = args.len();
         let comps_len = function_def.comps.len();
-        let values_size = computations_offset + comps_len;
-        let mut values = Vec::with_capacity(values_size);
+        let mut values = HashMap::new();
 
         self.stack.frames.push(0);
 
-        for arg in args {
-            values.push(arg.clone());
-        }
-        for _ in 0..values_size {
-            values.push(IRInterpreterValue::void());
+        for arg in 0..args.len() {
+            if let Some(id) = function_def.params[arg].0 {
+                values.insert(id, args[arg].clone());
+            }
         }
 
         // TODO : Take a reference instead of cloning
@@ -224,20 +224,20 @@ impl IRInterpreter {
             let mut target_comp = 0;
             let comp = &comps[current_comp];
 
-            values[computations_offset + current_comp] = match &comp.kind {
+            let value = match &comp.kind {
                 IRCompKind::FunctionCall(function_call) => {
                     let name = function_call.name;
                     let args = function_call
                         .args
                         .iter()
-                        .map(|irv| values[irv.index as usize].clone())
+                        .map(|irv| values[&irv.id].clone())
                         .collect::<Vec<_>>();
 
                     self.call_function(name, &args)
                 }
                 IRCompKind::BinaryOperation(operation) => {
-                    let left_operand = &values[operation.left_operand.index as usize];
-                    let right_operand = &values[operation.right_operand.index as usize];
+                    let left_operand = &values[&operation.left_operand.id];
+                    let right_operand = &values[&operation.right_operand.id];
 
                     let size = right_operand.bytes.len();
 
@@ -498,7 +498,7 @@ impl IRInterpreter {
                     }
                 }
                 IRCompKind::UnaryOperation(operation) => {
-                    let operand = &values[operation.operand.index as usize];
+                    let operand = &values[&operation.operand.id];
 
                     let size = operand.bytes.len();
 
@@ -511,6 +511,9 @@ impl IRInterpreter {
                                     0
                                 })
                             }
+                            IRCompUnaryOperationKind::BitNot => {
+                                IRInterpreterValue::from_u8(!operand.into_u8())
+                            }
                             IRCompUnaryOperationKind::SignedNegation => {
                                 IRInterpreterValue::from_i8(-operand.into_i8())
                             }
@@ -518,6 +521,9 @@ impl IRInterpreter {
 
                         2 => match operation.kind {
                             IRCompUnaryOperationKind::BoolNot => IRInterpreterValue::void(),
+                            IRCompUnaryOperationKind::BitNot => {
+                                IRInterpreterValue::from_u16(!operand.into_u16())
+                            }
                             IRCompUnaryOperationKind::SignedNegation => {
                                 IRInterpreterValue::from_i16(-operand.into_i16())
                             }
@@ -525,6 +531,9 @@ impl IRInterpreter {
 
                         4 => match operation.kind {
                             IRCompUnaryOperationKind::BoolNot => IRInterpreterValue::void(),
+                            IRCompUnaryOperationKind::BitNot => {
+                                IRInterpreterValue::from_u32(!operand.into_u32())
+                            }
                             IRCompUnaryOperationKind::SignedNegation => {
                                 IRInterpreterValue::from_i32(-operand.into_i32())
                             }
@@ -532,6 +541,9 @@ impl IRInterpreter {
 
                         8 => match operation.kind {
                             IRCompUnaryOperationKind::BoolNot => IRInterpreterValue::void(),
+                            IRCompUnaryOperationKind::BitNot => {
+                                IRInterpreterValue::from_u64(!operand.into_u64())
+                            }
                             IRCompUnaryOperationKind::SignedNegation => {
                                 IRInterpreterValue::from_i64(-operand.into_i64())
                             }
@@ -553,8 +565,8 @@ impl IRInterpreter {
                     IRInterpreterValue::from_u64(ptr)
                 }
                 IRCompKind::Store(ir_type, location, value) => {
-                    let value = &values[value.index as usize];
-                    let ptr = values[location.index as usize].into_u64() as *mut u8;
+                    let value = &values[&value.id];
+                    let ptr = values[&location.id].into_u64() as *mut u8;
                     let slice = std::slice::from_raw_parts_mut(ptr, ir_type.size as usize);
                     for i in 0..slice.len() {
                         slice[i] = value.bytes[i];
@@ -563,7 +575,7 @@ impl IRInterpreter {
                     IRInterpreterValue::void()
                 }
                 IRCompKind::Load(ir_type, location) => {
-                    let ptr = values[location.index as usize].into_u64() as *const u8;
+                    let ptr = values[&location.id].into_u64() as *const u8;
                     let slice = std::slice::from_raw_parts(ptr, ir_type.size as usize);
 
                     IRInterpreterValue {
@@ -571,8 +583,8 @@ impl IRInterpreter {
                     }
                 }
                 IRCompKind::OffsetStore(ir_type, location, value, offset) => {
-                    let value = &values[value.index as usize];
-                    let ptr = (values[location.index as usize].into_u64() + *offset) as *mut u8;
+                    let value = &values[&value.id];
+                    let ptr = (values[&location.id].into_u64() + *offset) as *mut u8;
                     let slice = std::slice::from_raw_parts_mut(ptr, ir_type.size as usize);
                     for i in 0..slice.len() {
                         slice[i] = value.bytes[i];
@@ -581,7 +593,7 @@ impl IRInterpreter {
                     IRInterpreterValue::void()
                 }
                 IRCompKind::OffsetLoad(ir_type, location, offset) => {
-                    let ptr = (values[location.index as usize].into_u64() + *offset) as *const u8;
+                    let ptr = (values[&location.id].into_u64() + *offset) as *const u8;
                     let slice = std::slice::from_raw_parts(ptr, ir_type.size as usize);
 
                     IRInterpreterValue {
@@ -589,7 +601,7 @@ impl IRInterpreter {
                     }
                 }
                 IRCompKind::Return(value) => {
-                    let value = &values[value.index as usize];
+                    let value = &values[&value.id];
 
                     for _ in 0..self.stack.frames.pop().unwrap() {
                         self.stack.values.pop();
@@ -598,21 +610,25 @@ impl IRInterpreter {
                     return value.clone();
                 }
                 IRCompKind::If(value, location) => {
-                    let value = &values[value.index as usize];
+                    let value = &values[&value.id];
                     if value.into_u8() != 0 {
                         performed_jump = true;
-                        target_comp = *location as usize;
+                        target_comp = self.label_defs[location] as usize;
                     }
 
                     IRInterpreterValue::void()
                 }
                 IRCompKind::Jmp(location) => {
                     performed_jump = true;
-                    target_comp = *location as usize;
+                    target_comp = self.label_defs[location] as usize;
 
                     IRInterpreterValue::void()
                 }
             };
+
+            if let Some(id) = comp.id {
+                values.insert(id, value);
+            }
 
             if !performed_jump {
                 current_comp += 1;

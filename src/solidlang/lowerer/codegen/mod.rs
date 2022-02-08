@@ -1,15 +1,22 @@
 use crate::globals::{SessionGlobals, Symbol};
-use crate::solidlang::ast::{ASTExpression, ASTExpressionKind, ASTFunctionDef, ASTStatement, ASTStatementBlock, ASTStatementKind};
-use crate::solidlang::context::function::Function;
-use crate::solidlang::context::ty::{Ty, TyKind, TyPrimitive};
-use crate::solidlang::lowerer::Lowerer;
-use std::collections::HashMap;
 use crate::ir::comp::{IRComp, IRCompKind};
 use crate::ir::{IRItem, IRItemFunctionDef, IRItemKind, IRType, IRValue};
+use crate::solidlang::ast::{
+    ASTFunctionDef, ASTStatement, ASTStatementBlock,
+    ASTStatementKind,
+};
+use crate::solidlang::context::function::Function;
+use crate::solidlang::context::ty::{Ty, TyPrimitive};
+use crate::solidlang::lowerer::Lowerer;
+use std::collections::HashMap;
+
+pub mod expression;
+
+#[derive()]
 
 #[derive(Clone)]
 enum ValueKind {
-    Direct(u64),
+    Direct(Symbol),
     None,
 }
 
@@ -23,41 +30,65 @@ impl Value {
     fn new_none() -> Self {
         Value {
             kind: ValueKind::None,
-            ty: Ty { kind: TyKind::Primitive(TyPrimitive::Void) }
+            ty: Ty::from_primitive(TyPrimitive::Void),
+        }
+    }
+
+    fn new_direct(id: Symbol, ty: Ty) -> Self {
+        Value {
+            kind: ValueKind::Direct(id),
+            ty,
         }
     }
 }
 
+#[derive(Clone)]
 struct CodegenScope {
     name_to_value_index: HashMap<Symbol, Value>,
 }
 
+#[derive(Clone)]
 struct CodegenContext {
     scopes: Vec<CodegenScope>,
-    current_value: u64,
     computations: Vec<IRComp>,
-    expected_return_type: Ty
+    current_value_index: usize,
+    current_label_index: usize,
+    expected_return_type: Ty,
+    label_defs: HashMap<Symbol, u64>
 }
 
 impl CodegenContext {
     fn new(expected_return_type: Ty) -> Self {
         Self {
             scopes: vec![],
-            current_value: 0,
             computations: vec![],
-            expected_return_type
+            current_value_index: 0,
+            current_label_index: 0,
+            expected_return_type,
+            label_defs: HashMap::new()
         }
     }
 
-    fn get_current_computation_index(&mut self) -> u64 {
-        self.computations.len() as u64 - 1
+    fn create_new_id_for_value(&mut self) -> Symbol {
+        let id = format!("_{}", self.current_value_index);
+        let id = SessionGlobals::with_interner_mut(|i| i.intern(&id));
+        self.current_value_index += 1;
+        id
     }
 
-    fn add_computation(&mut self, comp: IRComp) -> u64 {
+    fn create_new_id_for_label(&mut self) -> Symbol {
+        let id = format!("_label_{}", self.current_label_index);
+        let id = SessionGlobals::with_interner_mut(|i| i.intern(&id));
+        self.current_label_index += 1;
+        id
+    }
+
+    fn place_label(&mut self, label: Symbol) {
+        self.label_defs.insert(label, self.computations.len() as u64);
+    }
+
+    fn add_computation(&mut self, comp: IRComp) {
         self.computations.push(comp);
-        let value = self.current_value;
-        self.current_value += 1;
-        value
     }
 
     fn start_scope(&mut self) {
@@ -88,14 +119,6 @@ impl CodegenContext {
 
         None
     }
-
-    fn direct_value_current(&mut self, ty: Ty) -> Value {
-        let value = Value {
-            kind: ValueKind::Direct(self.current_value),
-            ty,
-        };
-        value
-    }
 }
 
 enum CompilationResult {
@@ -115,81 +138,23 @@ impl CompilationResult {
 impl Lowerer {
     fn get_ir_value(&mut self, value: &Value) -> IRValue {
         match &value.kind {
-            ValueKind::Direct(index) => IRValue { index: *index },
-            ValueKind::None => todo!()
-        }
-    }
-
-    fn compile_expression(
-        &mut self,
-        expression: &ASTExpression,
-        codegen_context: &mut CodegenContext,
-        expected_type: Option<&Ty>
-    ) -> CompilationResult {
-        match &expression.kind {
-            ASTExpressionKind::Ident(ident) => {
-                if let Some(value) = codegen_context.resolve_name(ident) {
-                    if let Some(expected_type) = expected_type {
-                        if !value.ty.eq(expected_type) {
-                            panic!("ERROR Unexpected type");
-                        }
-                    }
-                    CompilationResult::Value(value)
-                }
-                else {
-                    panic!("ERROR Could not find value for identifier");
-                }
-            }
-            ASTExpressionKind::IntegerLiteral(_) => {
-                todo!()
-            }
-            ASTExpressionKind::UnaryOperation(_, _) => {
-                todo!()
-            }
-            ASTExpressionKind::BinaryOperation(_, _, _) => {
-                todo!()
-            }
-            ASTExpressionKind::If(_, _, _) => {
-                todo!()
-            }
-            ASTExpressionKind::While(_, _) => {
-                todo!()
-            }
-            ASTExpressionKind::Loop(_) => {
-                todo!()
-            }
-            ASTExpressionKind::For(_, _, _) => {
-                todo!()
-            }
-            ASTExpressionKind::TemplateApplication(_, _) => {
-                todo!()
-            }
-            ASTExpressionKind::Call(_, _) => {
-                todo!()
-            }
-            ASTExpressionKind::Index(_, _) => {
-                todo!()
-            }
-            ASTExpressionKind::MemberAccess(_, _) => {
-                todo!()
-            }
-            ASTExpressionKind::StaticAccess(_, _) => {
-                todo!()
-            }
+            ValueKind::Direct(index) => IRValue { id: *index },
+            ValueKind::None => todo!(),
         }
     }
 
     fn compile_statement(
         &mut self,
         statement: &ASTStatement,
-        codegen_context: &mut CodegenContext
+        codegen_context: &mut CodegenContext,
+        expected_expression_type: Option<&Ty>
     ) -> CompilationResult {
         match &statement.kind {
             ASTStatementKind::LocalBinding(_, _, _) => {
                 todo!()
             }
             ASTStatementKind::Expression(expression) => {
-                self.compile_expression(expression, codegen_context, None)
+                self.compile_expression(expression, codegen_context, expected_expression_type)
             }
             ASTStatementKind::Return(expression) => {
                 let ert = codegen_context.expected_return_type.clone();
@@ -197,11 +162,12 @@ impl Lowerer {
                 match result {
                     CompilationResult::Value(value) => {
                         codegen_context.add_computation(IRComp {
-                            kind: IRCompKind::Return(self.get_ir_value(&value))
+                            kind: IRCompKind::Return(self.get_ir_value(&value)),
+                            id: None,
                         });
                         CompilationResult::Returning
-                    },
-                    r => r
+                    }
+                    r => r,
                 }
             }
             ASTStatementKind::Break => {
@@ -213,9 +179,7 @@ impl Lowerer {
             ASTStatementKind::Item(_) => {
                 unreachable!()
             }
-            ASTStatementKind::Semicolon => {
-                CompilationResult::Value(Value::new_none())
-            }
+            ASTStatementKind::Semicolon => CompilationResult::Value(Value::new_none()),
         }
     }
 
@@ -240,10 +204,20 @@ impl Lowerer {
         self.preprocess_items(&items);
         self.process_function_items(&items);
 
+        let statements: Vec<_> = statement_block
+            .statements
+            .iter()
+            .filter(|statement| match &statement.kind {
+                ASTStatementKind::Item(_) => false,
+                _ => true,
+            })
+            .collect();
+
         let mut result = CompilationResult::Value(Value::new_none());
-        for statement in &statement_block.statements {
-            if let ASTStatementKind::Item(_) = statement.kind { continue; }
-            result = self.compile_statement(statement, codegen_context);
+        for i in 0..statements.len() {
+            result = self.compile_statement(statements[i], codegen_context, if i == statements.len() - 1 {
+                expected_type
+            } else { None });
             if result.is_returning() {
                 break;
             }
@@ -279,9 +253,7 @@ impl Lowerer {
         let resolved_return_type = if let Some(return_type) = &function_def.return_type {
             self.resolve_type(return_type)
         } else {
-            Ty {
-                kind: TyKind::Primitive(TyPrimitive::Void),
-            }
+            Ty::from_primitive(TyPrimitive::Void)
         };
 
         let ir_name = SessionGlobals::with_interner_mut(|i| {
@@ -294,21 +266,32 @@ impl Lowerer {
         let mut codegen_context = CodegenContext::new(resolved_return_type.clone());
         codegen_context.start_scope();
 
-        for (param_sym, param_ty) in &resolved_params {
-            let value = codegen_context.direct_value_current(param_ty.clone());
-            codegen_context.current_value += 1;
-            codegen_context.bind_name(*param_sym, value);
-        }
+        let mut param_ids = vec![];
+        SessionGlobals::with_interner_mut(|i| {
+            let mut current_param_id: usize = 0;
+            for (param_sym, param_ty) in &resolved_params {
+                let param_id = format!("_param_{}", current_param_id);
+                let param_id = i.intern(&param_id);
+                param_ids.push(param_id);
+                let value = Value::new_direct(param_id, param_ty.clone());
+                codegen_context.bind_name(*param_sym, value);
+                current_param_id += 1;
+            }
+        });
 
-        let result =
-            self.compile_statement_block(&function_def.statement_block, &mut codegen_context, Some(&resolved_return_type));
+        let result = self.compile_statement_block(
+            &function_def.statement_block,
+            &mut codegen_context,
+            Some(&resolved_return_type),
+        );
 
         // No need to return anything if the return type is void
         if resolved_return_type.get_size_and_align().0 != 0 {
             match &result {
                 CompilationResult::Value(value) => {
                     codegen_context.add_computation(IRComp {
-                        kind: IRCompKind::Return(self.get_ir_value(value))
+                        kind: IRCompKind::Return(self.get_ir_value(value)),
+                        id: None,
                     });
                 }
                 CompilationResult::Returning => {}
@@ -320,10 +303,17 @@ impl Lowerer {
         self.ir_module.items.push(IRItem {
             kind: IRItemKind::FunctionDef(IRItemFunctionDef {
                 name: ir_name,
-                params: resolved_params.iter().map(|(_, ty)| ty_to_ir_type(ty)).collect(),
+                params: (0..resolved_params.len())
+                    .map(|i| {
+                        let param_id = Some(param_ids[i]);
+                        let ir_type = ty_to_ir_type(&resolved_params[i].1);
+                        (param_id, ir_type)
+                    })
+                    .collect(),
                 return_type: ty_to_ir_type(&resolved_return_type),
-                comps: codegen_context.computations
-            })
+                comps: codegen_context.computations,
+                label_defs: codegen_context.label_defs
+            }),
         });
 
         Function {
@@ -339,8 +329,5 @@ fn ty_to_ir_type(ty: &Ty) -> IRType {
     let (size, align) = ty.get_size_and_align();
     let size = size as u64;
     let align = align as u64;
-    IRType {
-        size,
-        align
-    }
+    IRType { size, align }
 }
