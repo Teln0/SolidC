@@ -66,7 +66,7 @@ fn main(a: Test<u8>, b: Test<u16>) -> i32 {
     fn test(t: Test<u8>) -> i32 { 0 }
     fn test(t: Test<u16>) -> bool { true }
 
-    if { return test(a); } {
+    while true {
         return test(a);
     }
 
@@ -79,6 +79,7 @@ fn main(a: Test<u8>, b: Test<u16>) -> i32 {
         let lowerer = Lowerer::new();
         let ir_module = lowerer.lower(&module);
 
+        println!("_");
         println!("{}", assembly_for_ir_modules(&ir_module));
     });
 }

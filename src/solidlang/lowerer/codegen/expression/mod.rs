@@ -362,7 +362,6 @@ impl Lowerer {
                     }),
                     id: Some(condition_negation_id)
                 });
-
                 codegen_context.add_computation(IRComp {
                     kind: IRCompKind::If(IRValue { id: condition_negation_id }, if_end_label),
                     id: None
@@ -407,8 +406,47 @@ impl Lowerer {
                     CompilationResult::Value(Value::new_none())
                 }
             }
-            ASTExpressionKind::While(_, _) => {
-                todo!()
+            ASTExpressionKind::While(condition, block) => {
+                if let Some(expected_type) = expected_type {
+                    if !expected_type.eq(&Ty::from_primitive(TyPrimitive::Void)) {
+                        panic!("ERROR Type of while expression is always void");
+                    }
+                }
+
+                let while_begin_label = codegen_context.create_new_id_for_label();
+                let while_end_label = codegen_context.create_new_id_for_label();
+
+                codegen_context.place_label(while_begin_label);
+
+                let result = self.compile_expression(condition, codegen_context, Some(&Ty::from_primitive(TyPrimitive::Bool)));
+                let condition = match &result {
+                    CompilationResult::Value(value) => value,
+                    CompilationResult::Returning => return CompilationResult::Returning,
+                };
+
+                let condition_negation_id = codegen_context.create_new_id_for_value();
+                codegen_context.add_computation(IRComp {
+                    kind: IRCompKind::UnaryOperation(IRCompUnaryOperation {
+                        kind: IRCompUnaryOperationKind::BoolNot,
+                        operand: self.get_ir_value(condition)
+                    }),
+                    id: Some(condition_negation_id)
+                });
+                codegen_context.add_computation(IRComp {
+                    kind: IRCompKind::If(IRValue { id: condition_negation_id }, while_end_label),
+                    id: None
+                });
+
+                self.compile_statement_block(block, codegen_context, Some(&Ty::from_primitive(TyPrimitive::Void)));
+
+                codegen_context.add_computation(IRComp {
+                    kind: IRCompKind::Jmp(while_begin_label),
+                    id: None
+                });
+
+                codegen_context.place_label(while_end_label);
+
+                CompilationResult::Value(Value::new_none())
             }
             ASTExpressionKind::Loop(_) => {
                 todo!()
