@@ -1,6 +1,5 @@
 use crate::globals::{SessionGlobals, Symbol};
-use crate::solidlang::context::function::Function;
-use crate::solidlang::context::pool::{Pool, PoolRef};
+use crate::solidlang::context::pool::{PoolRef};
 
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum TyPrimitive {
@@ -17,21 +16,21 @@ pub enum TyPrimitive {
     Void,
 }
 
-#[derive(Debug, Hash, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone)]
 pub struct TyStructField {
     pub offset: usize,
     pub name: Symbol,
     pub ty: PoolRef<Ty>,
 }
 
-#[derive(Debug, Hash, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone)]
 pub struct TyStruct {
     pub fields: Vec<TyStructField>,
     pub align: usize,
     pub size: usize,
 }
 
-#[derive(Debug, Hash, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone)]
 pub enum TyKind {
     Primitive(TyPrimitive),
     PointerTo(PoolRef<Ty>),
@@ -39,7 +38,7 @@ pub enum TyKind {
     PlaceholderUnknown,
 }
 
-#[derive(Debug, Hash, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone)]
 pub struct Ty {
     pub kind: TyKind,
 }

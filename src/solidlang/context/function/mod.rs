@@ -2,7 +2,7 @@ use crate::globals::Symbol;
 use crate::solidlang::context::pool::PoolRef;
 use crate::solidlang::context::ty::Ty;
 
-#[derive(Debug, Hash, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone)]
 pub struct Function {
     pub path: Vec<Symbol>,
     pub params: Vec<PoolRef<Ty>>,

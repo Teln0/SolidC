@@ -1,5 +1,4 @@
 use crate::globals::{SessionGlobals, Symbol};
-use crate::solidlang::context::function::Function;
 use crate::solidlang::context::pool::PoolRef;
 use crate::solidlang::context::template::Template;
 use crate::solidlang::context::ty::{DefaultTys, Ty};

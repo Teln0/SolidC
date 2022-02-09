@@ -54,30 +54,8 @@ fn main() {
         */
 
         let src = "
-struct Test {
-    a: u8,
-    b: Test2,
-    c: Test3
-}
-
-struct Test2 {
-    d: u16,
-    e: Test3
-}
-
-struct Test3 {
-    f: Test4<u64>
-}
-
-template<T>
-struct Test4 {
-    g: *T,
-    h: Test5<u8>
-}
-
-template<T>
-struct Test5 {
-    i: T
+fn main(argc: i32, argv: **u8) -> i32 {
+    0
 }
     ";
 

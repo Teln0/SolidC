@@ -1,10 +1,9 @@
 use crate::globals::SessionGlobals;
 use crate::solidlang::context::ty::Ty;
-use bimap::BiMap;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
 
-#[derive(Hash, Eq, PartialEq)]
+#[derive(Hash)]
 pub struct PoolRef<T> {
     index: usize,
     _marker: std::marker::PhantomData<T>,

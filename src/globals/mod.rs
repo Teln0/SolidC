@@ -1,4 +1,4 @@
-use crate::solidlang::context::pool::{Pool, PoolRef};
+use crate::solidlang::context::pool::{Pool};
 use crate::solidlang::context::ty::Ty;
 use bimap::BiMap;
 use scoped_tls::scoped_thread_local;
