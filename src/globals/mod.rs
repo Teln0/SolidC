@@ -1,10 +1,9 @@
-use crate::solidlang::context::pool::{Pool};
-use crate::solidlang::context::ty::Ty;
+use crate::solidlang::pool::{Pool};
 use bimap::BiMap;
 use scoped_tls::scoped_thread_local;
 use std::cell::RefCell;
 use std::fmt::{Debug, Formatter};
-use crate::solidlang::context::template::Template;
+use crate::solidlang::defs::{FunctionDef, StructDef};
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct Symbol {
@@ -58,8 +57,8 @@ impl StringInterner {
 
 pub struct SessionGlobals {
     pub string_interner: RefCell<StringInterner>,
-    pub ty_pool: RefCell<Pool<Ty>>,
-    pub template_pool: RefCell<Pool<Template>>
+    pub struct_def_pool: RefCell<Pool<StructDef>>,
+    pub function_def_pool: RefCell<Pool<FunctionDef>>
 }
 
 scoped_thread_local!(static SESSION_GLOBALS: SessionGlobals);
@@ -68,8 +67,8 @@ impl SessionGlobals {
     pub fn new() -> Self {
         Self {
             string_interner: RefCell::new(StringInterner::new()),
-            ty_pool: RefCell::new(Pool::new()),
-            template_pool: RefCell::new(Pool::new())
+            struct_def_pool: RefCell::new(Pool::new()),
+            function_def_pool: RefCell::new(Pool::new())
         }
     }
 
@@ -89,19 +88,19 @@ impl SessionGlobals {
         SESSION_GLOBALS.with(|sg| function(&mut sg.string_interner.borrow_mut()))
     }
 
-    pub fn with_ty_pool<T>(function: impl FnOnce(&Pool<Ty>) -> T) -> T {
-        SESSION_GLOBALS.with(|sg| function(&sg.ty_pool.borrow()))
+    pub fn with_struct_def_pool<T>(function: impl FnOnce(&Pool<StructDef>) -> T) -> T {
+        SESSION_GLOBALS.with(|sg| function(&sg.struct_def_pool.borrow()))
     }
 
-    pub fn with_ty_pool_mut<T>(function: impl FnOnce(&mut Pool<Ty>) -> T) -> T {
-        SESSION_GLOBALS.with(|sg| function(&mut sg.ty_pool.borrow_mut()))
+    pub fn with_struct_def_pool_mut<T>(function: impl FnOnce(&mut Pool<StructDef>) -> T) -> T {
+        SESSION_GLOBALS.with(|sg| function(&mut sg.struct_def_pool.borrow_mut()))
     }
 
-    pub fn with_template_pool<T>(function: impl FnOnce(&Pool<Template>) -> T) -> T {
-        SESSION_GLOBALS.with(|sg| function(&sg.template_pool.borrow()))
+    pub fn with_function_def_pool<T>(function: impl FnOnce(&Pool<FunctionDef>) -> T) -> T {
+        SESSION_GLOBALS.with(|sg| function(&sg.function_def_pool.borrow()))
     }
 
-    pub fn with_template_pool_mut<T>(function: impl FnOnce(&mut Pool<Template>) -> T) -> T {
-        SESSION_GLOBALS.with(|sg| function(&mut sg.template_pool.borrow_mut()))
+    pub fn with_function_def_pool_mut<T>(function: impl FnOnce(&mut Pool<FunctionDef>) -> T) -> T {
+        SESSION_GLOBALS.with(|sg| function(&mut sg.function_def_pool.borrow_mut()))
     }
 }

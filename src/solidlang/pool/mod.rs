@@ -1,7 +1,7 @@
 use crate::globals::SessionGlobals;
-use crate::solidlang::context::ty::Ty;
 use std::fmt::{Debug, Formatter};
 use std::hash::Hash;
+use crate::solidlang::defs::StructDef;
 
 #[derive(Hash)]
 pub struct PoolRef<T> {
@@ -16,9 +16,9 @@ impl<T> Clone for PoolRef<T> {
 }
 impl<T> Copy for PoolRef<T> {}
 
-impl Debug for PoolRef<Ty> {
+impl Debug for PoolRef<StructDef> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        SessionGlobals::with_ty_pool(|pool| pool.get(*self).fmt(f))
+        SessionGlobals::with_struct_def_pool(|pool| pool.get(*self).fmt(f))
     }
 }
 

@@ -54,9 +54,7 @@ fn main() {
         */
 
         let src = "
-fn main(argc: i32, argv: **u8) -> i32 {
-    0
-}
+fn main(argc: i32, argv: **u8) -> i32 { 0 }
     ";
 
         let mut parser = Parser::new(lex(src), src);

@@ -1,5 +1,5 @@
-use crate::globals::{SessionGlobals, Symbol};
-use crate::solidlang::context::pool::{PoolRef};
+use crate::solidlang::pool::{PoolRef};
+use crate::solidlang::defs::StructDef;
 
 #[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum TyPrimitive {
@@ -16,34 +16,22 @@ pub enum TyPrimitive {
     Void,
 }
 
-#[derive(Debug, Hash, Clone)]
-pub struct TyStructField {
-    pub offset: usize,
-    pub name: Symbol,
-    pub ty: PoolRef<Ty>,
-}
-
-#[derive(Debug, Hash, Clone)]
-pub struct TyStruct {
-    pub fields: Vec<TyStructField>,
-    pub align: usize,
-    pub size: usize,
-}
-
-#[derive(Debug, Hash, Clone)]
+#[derive(Debug, Clone)]
 pub enum TyKind {
     Primitive(TyPrimitive),
-    PointerTo(PoolRef<Ty>),
-    Struct(TyStruct),
-    PlaceholderUnknown,
+    PointerTo(Box<Ty>),
+    Struct(PoolRef<StructDef>),
+    StructWithArgs(PoolRef<StructDef>, Box<[Ty]>),
+    Param(usize)
 }
 
-#[derive(Debug, Hash, Clone)]
+#[derive(Debug, Clone)]
 pub struct Ty {
     pub kind: TyKind,
 }
 
 impl Ty {
+    /*
     // TODO Optimize this whole thing
     pub fn struct_recompute_offsets_size_and_align_recursive(pool_ref: PoolRef<Ty>) {
         let to_recompute = SessionGlobals::with_ty_pool(|pool| {
@@ -122,47 +110,17 @@ impl Ty {
         }
     }
 
+     */
+
     pub fn from_primitive(primitive: TyPrimitive) -> Self {
         Self {
             kind: TyKind::Primitive(primitive),
         }
     }
 
-    pub fn placeholder_unknown() -> Self {
+    pub fn from_struct_def(struct_def: PoolRef<StructDef>) -> Self {
         Self {
-            kind: TyKind::PlaceholderUnknown,
+            kind: TyKind::Struct(struct_def)
         }
-    }
-}
-
-pub struct DefaultTys {
-    pub i8: PoolRef<Ty>,
-    pub u8: PoolRef<Ty>,
-    pub i16: PoolRef<Ty>,
-    pub u16: PoolRef<Ty>,
-    pub i32: PoolRef<Ty>,
-    pub u32: PoolRef<Ty>,
-    pub i64: PoolRef<Ty>,
-    pub u64: PoolRef<Ty>,
-    pub bool: PoolRef<Ty>,
-    pub char: PoolRef<Ty>,
-    pub void: PoolRef<Ty>,
-}
-
-impl DefaultTys {
-    pub fn create() -> Self {
-        SessionGlobals::with_ty_pool_mut(|pool| DefaultTys {
-            i8: pool.add(Ty::from_primitive(TyPrimitive::I8)),
-            u8: pool.add(Ty::from_primitive(TyPrimitive::U8)),
-            i16: pool.add(Ty::from_primitive(TyPrimitive::I16)),
-            u16: pool.add(Ty::from_primitive(TyPrimitive::U16)),
-            i32: pool.add(Ty::from_primitive(TyPrimitive::I32)),
-            u32: pool.add(Ty::from_primitive(TyPrimitive::U32)),
-            i64: pool.add(Ty::from_primitive(TyPrimitive::I64)),
-            u64: pool.add(Ty::from_primitive(TyPrimitive::U64)),
-            bool: pool.add(Ty::from_primitive(TyPrimitive::Bool)),
-            char: pool.add(Ty::from_primitive(TyPrimitive::Char)),
-            void: pool.add(Ty::from_primitive(TyPrimitive::Void)),
-        })
     }
 }
