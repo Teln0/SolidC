@@ -1,9 +1,8 @@
 use crate::globals::{SessionGlobals, Symbol};
-use std::collections::HashMap;
+use crate::solidlang::context::function::Function;
+use crate::solidlang::context::pool::{Pool, PoolRef};
 
-// TODO : Implement a "type interner"
-
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum TyPrimitive {
     U8,
     I8,
@@ -18,33 +17,89 @@ pub enum TyPrimitive {
     Void,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct TyStructField {
     pub offset: usize,
     pub name: Symbol,
-    pub ty: Ty,
+    pub ty: PoolRef<Ty>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct TyStruct {
     pub fields: Vec<TyStructField>,
     pub align: usize,
     pub size: usize,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub enum TyKind {
     Primitive(TyPrimitive),
-    PointerTo(Box<Ty>),
-    Struct(TyStruct)
+    PointerTo(PoolRef<Ty>),
+    Struct(TyStruct),
+    PlaceholderUnknown,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Hash, Clone, Eq, PartialEq)]
 pub struct Ty {
     pub kind: TyKind,
 }
 
 impl Ty {
+    // TODO Optimize this whole thing
+    pub fn struct_recompute_offsets_size_and_align_recursive(pool_ref: PoolRef<Ty>) {
+        let to_recompute = SessionGlobals::with_ty_pool(|pool| {
+            let self_ty = pool.get(pool_ref);
+            match &self_ty.kind {
+                TyKind::Struct(s) => Some(s.fields.clone()),
+                _ => None,
+            }
+        });
+
+        if let Some(to_recompute) = to_recompute {
+            for to_recompute in &to_recompute {
+                Self::struct_recompute_offsets_size_and_align_recursive(to_recompute.ty);
+            }
+
+            SessionGlobals::with_ty_pool_mut(|pool| {
+                let mut fields = match &pool.get(pool_ref).kind {
+                    TyKind::Struct(s) => s.fields.clone(),
+                    _ => unreachable!(),
+                };
+
+                let mut current_offset = 0;
+                let mut max_align = 1;
+                for field in &mut fields {
+                    let (size, align) = pool.get(field.ty).get_size_and_align();
+
+                    if align > max_align {
+                        max_align = align;
+                    }
+
+                    if current_offset % align != 0 {
+                        current_offset += align - current_offset % align;
+                    }
+
+                    field.offset = current_offset;
+
+                    current_offset += size;
+                }
+
+                if current_offset % max_align != 0 {
+                    current_offset += max_align - current_offset % max_align;
+                }
+
+                match &mut pool.get_mut(pool_ref).kind {
+                    TyKind::Struct(s) => {
+                        s.size = current_offset;
+                        s.fields = fields;
+                        s.align = max_align;
+                    }
+                    _ => unreachable!(),
+                }
+            })
+        }
+    }
+
     pub fn get_size_and_align(&self) -> (usize, usize) {
         match &self.kind {
             TyKind::Primitive(primitive) => match primitive {
@@ -61,183 +116,54 @@ impl Ty {
                 TyPrimitive::Void => (0, 1),
             },
             TyKind::PointerTo(_) => (8, 8),
-            TyKind::Struct(s) => (s.size, s.align)
+            TyKind::Struct(s) => (s.size, s.align),
+            TyKind::PlaceholderUnknown => {
+                panic!("ERROR Cannot compute size and alignment of unknown type")
+            }
         }
     }
 
     pub fn from_primitive(primitive: TyPrimitive) -> Self {
-        Ty {
+        Self {
             kind: TyKind::Primitive(primitive),
         }
     }
+
+    pub fn placeholder_unknown() -> Self {
+        Self {
+            kind: TyKind::PlaceholderUnknown,
+        }
+    }
 }
 
-#[derive(Clone)]
-pub struct TyScope {
-    path_to_type: HashMap<Vec<Symbol>, Ty>,
+pub struct DefaultTys {
+    pub i8: PoolRef<Ty>,
+    pub u8: PoolRef<Ty>,
+    pub i16: PoolRef<Ty>,
+    pub u16: PoolRef<Ty>,
+    pub i32: PoolRef<Ty>,
+    pub u32: PoolRef<Ty>,
+    pub i64: PoolRef<Ty>,
+    pub u64: PoolRef<Ty>,
+    pub bool: PoolRef<Ty>,
+    pub char: PoolRef<Ty>,
+    pub void: PoolRef<Ty>,
 }
 
-pub struct TyContext {
-    scopes: Vec<TyScope>,
-}
-
-impl TyContext {
-    fn new_empty() -> Self {
-        Self { scopes: vec![] }
-    }
-
-    pub fn new() -> Self {
-        let mut result = Self::new_empty();
-        result.start_scope();
-        SessionGlobals::with_interner_mut(|i| {
-            result.register_type(
-                &[i.intern("u8")],
-                Ty {
-                    kind: TyKind::Primitive(TyPrimitive::U8),
-                },
-            );
-            result.register_type(
-                &[i.intern("i8")],
-                Ty {
-                    kind: TyKind::Primitive(TyPrimitive::I8),
-                },
-            );
-            result.register_type(
-                &[i.intern("u16")],
-                Ty {
-                    kind: TyKind::Primitive(TyPrimitive::U16),
-                },
-            );
-            result.register_type(
-                &[i.intern("i16")],
-                Ty {
-                    kind: TyKind::Primitive(TyPrimitive::I16),
-                },
-            );
-            result.register_type(
-                &[i.intern("u32")],
-                Ty {
-                    kind: TyKind::Primitive(TyPrimitive::U32),
-                },
-            );
-            result.register_type(
-                &[i.intern("i32")],
-                Ty {
-                    kind: TyKind::Primitive(TyPrimitive::I32),
-                },
-            );
-            result.register_type(
-                &[i.intern("u64")],
-                Ty {
-                    kind: TyKind::Primitive(TyPrimitive::U64),
-                },
-            );
-            result.register_type(
-                &[i.intern("i64")],
-                Ty {
-                    kind: TyKind::Primitive(TyPrimitive::I64),
-                },
-            );
-            result.register_type(
-                &[i.intern("bool")],
-                Ty {
-                    kind: TyKind::Primitive(TyPrimitive::Bool),
-                },
-            );
-            result.register_type(
-                &[i.intern("char")],
-                Ty {
-                    kind: TyKind::Primitive(TyPrimitive::Char),
-                },
-            );
-            result.register_type(
-                &[i.intern("void")],
-                Ty {
-                    kind: TyKind::Primitive(TyPrimitive::Void),
-                },
-            );
-        });
-
-        result
-    }
-
-    pub fn resolve_type(&self, path: &[Symbol]) -> Option<Ty> {
-        let len = self.scopes.len();
-        for i in (0..len).rev() {
-            if let Some(ty) = self.scopes[i].path_to_type.get(path) {
-                return Some(ty.clone());
-            }
-        }
-
-        None
-    }
-
-    pub fn register_type(&mut self, path: &[Symbol], ty: Ty) {
-        self.scopes
-            .last_mut()
-            .unwrap()
-            .path_to_type
-            .insert(path.to_vec(), ty);
-    }
-
-    pub fn create_struct_ty(&self, fields: &[(Symbol, Ty)]) -> Ty {
-        // TODO : Support for non power of two alignments ? Would that even be useful ?
-
-        let mut current_offset = 0;
-        let mut max_align = 1;
-
-        let mut struct_fields = vec![];
-        for (symbol, field_ty) in fields {
-            let (size, align) = field_ty.get_size_and_align();
-
-            if align > max_align {
-                max_align = align;
-            }
-
-            if current_offset % align != 0 {
-                current_offset += align - current_offset % align;
-            }
-
-            struct_fields.push(TyStructField {
-                offset: current_offset,
-                name: *symbol,
-                ty: field_ty.clone(),
-            });
-
-            current_offset += size;
-        }
-
-        // Padding at the end of the struct
-        if current_offset % max_align != 0 {
-            current_offset += max_align - current_offset % max_align;
-        }
-
-        Ty {
-            kind: TyKind::Struct(TyStruct {
-                size: current_offset,
-                fields: struct_fields,
-                align: max_align,
-            }),
-        }
-    }
-
-    pub fn start_scope(&mut self) {
-        self.scopes.push(TyScope {
-            path_to_type: HashMap::new(),
-        });
-    }
-
-    pub fn close_scope(&mut self) {
-        self.scopes.pop();
-    }
-
-    pub fn get_current_scopes(&self) -> Vec<TyScope> {
-        self.scopes.clone()
-    }
-
-    pub fn swap_scopes(&mut self, with: Vec<TyScope>) -> Vec<TyScope> {
-        let current_scopes = self.get_current_scopes();
-        self.scopes = with;
-        current_scopes
+impl DefaultTys {
+    pub fn create() -> Self {
+        SessionGlobals::with_ty_pool_mut(|pool| DefaultTys {
+            i8: pool.add(Ty::from_primitive(TyPrimitive::I8)),
+            u8: pool.add(Ty::from_primitive(TyPrimitive::U8)),
+            i16: pool.add(Ty::from_primitive(TyPrimitive::I16)),
+            u16: pool.add(Ty::from_primitive(TyPrimitive::U16)),
+            i32: pool.add(Ty::from_primitive(TyPrimitive::I32)),
+            u32: pool.add(Ty::from_primitive(TyPrimitive::U32)),
+            i64: pool.add(Ty::from_primitive(TyPrimitive::I64)),
+            u64: pool.add(Ty::from_primitive(TyPrimitive::U64)),
+            bool: pool.add(Ty::from_primitive(TyPrimitive::Bool)),
+            char: pool.add(Ty::from_primitive(TyPrimitive::Char)),
+            void: pool.add(Ty::from_primitive(TyPrimitive::Void)),
+        })
     }
 }

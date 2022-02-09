@@ -1,6 +1,6 @@
-use std::collections::HashMap;
 use crate::globals::Symbol;
 use crate::ir::comp::IRComp;
+use std::collections::HashMap;
 
 pub mod assembly;
 pub mod comp;
@@ -22,7 +22,7 @@ pub struct IRItemFunctionDef {
     pub return_type: IRType,
     pub params: Vec<(Option<Symbol>, IRType)>,
     pub comps: Vec<IRComp>,
-    pub label_defs: HashMap<Symbol, u64>
+    pub label_defs: HashMap<Symbol, u64>,
 }
 
 pub enum IRItemKind {

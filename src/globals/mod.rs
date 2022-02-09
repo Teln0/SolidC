@@ -1,10 +1,20 @@
+use crate::solidlang::context::pool::{Pool, PoolRef};
+use crate::solidlang::context::ty::Ty;
 use bimap::BiMap;
 use scoped_tls::scoped_thread_local;
 use std::cell::RefCell;
+use std::fmt::{Debug, Formatter};
+use crate::solidlang::context::template::Template;
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
 pub struct Symbol {
     index: u64,
+}
+
+impl Debug for Symbol {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        SessionGlobals::with_interner(|i| i.get(self).unwrap().fmt(f))
+    }
 }
 
 pub struct StringInterner {
@@ -48,6 +58,8 @@ impl StringInterner {
 
 pub struct SessionGlobals {
     pub string_interner: RefCell<StringInterner>,
+    pub ty_pool: RefCell<Pool<Ty>>,
+    pub template_pool: RefCell<Pool<Template>>
 }
 
 scoped_thread_local!(static SESSION_GLOBALS: SessionGlobals);
@@ -56,6 +68,8 @@ impl SessionGlobals {
     pub fn new() -> Self {
         Self {
             string_interner: RefCell::new(StringInterner::new()),
+            ty_pool: RefCell::new(Pool::new()),
+            template_pool: RefCell::new(Pool::new())
         }
     }
 
@@ -73,5 +87,21 @@ impl SessionGlobals {
 
     pub fn with_interner_mut<T>(function: impl FnOnce(&mut StringInterner) -> T) -> T {
         SESSION_GLOBALS.with(|sg| function(&mut sg.string_interner.borrow_mut()))
+    }
+
+    pub fn with_ty_pool<T>(function: impl FnOnce(&Pool<Ty>) -> T) -> T {
+        SESSION_GLOBALS.with(|sg| function(&sg.ty_pool.borrow()))
+    }
+
+    pub fn with_ty_pool_mut<T>(function: impl FnOnce(&mut Pool<Ty>) -> T) -> T {
+        SESSION_GLOBALS.with(|sg| function(&mut sg.ty_pool.borrow_mut()))
+    }
+
+    pub fn with_template_pool<T>(function: impl FnOnce(&Pool<Template>) -> T) -> T {
+        SESSION_GLOBALS.with(|sg| function(&sg.template_pool.borrow()))
+    }
+
+    pub fn with_template_pool_mut<T>(function: impl FnOnce(&mut Pool<Template>) -> T) -> T {
+        SESSION_GLOBALS.with(|sg| function(&mut sg.template_pool.borrow_mut()))
     }
 }

@@ -1,5 +1,4 @@
 use solidc::globals::SessionGlobals;
-use solidc::ir::assembly::assembly_for_ir_modules;
 use solidc::solidlang::lexer::lex;
 use solidc::solidlang::lowerer::Lowerer;
 use solidc::solidlang::parser::Parser;
@@ -55,31 +54,36 @@ fn main() {
         */
 
         let src = "
-template<T>
 struct Test {
-    field_1: T,
-    field_2: T,
-    field_3: T
+    a: u8,
+    b: Test2,
+    c: Test3
 }
 
-fn main(a: Test<u8>, b: Test<u16>) -> i32 {
-    fn test(t: Test<u8>) -> i32 { 0 }
-    fn test(t: Test<u16>) -> bool { true }
+struct Test2 {
+    d: u16,
+    e: Test3
+}
 
-    while true {
-        return test(a);
-    }
+struct Test3 {
+    f: Test4<u64>
+}
 
-    0
+template<T>
+struct Test4 {
+    g: *T,
+    h: Test5<u8>
+}
+
+template<T>
+struct Test5 {
+    i: T
 }
     ";
 
         let mut parser = Parser::new(lex(src), src);
         let module = parser.parse_module().unwrap();
         let lowerer = Lowerer::new();
-        let ir_module = lowerer.lower(&module);
-
-        println!("_");
-        println!("{}", assembly_for_ir_modules(&ir_module));
+        lowerer.process_module(module);
     });
 }

@@ -172,7 +172,7 @@ impl ASTExpression {
                     path.push(*symbol);
                     expression = e;
                 }
-                _ => break Some(expression)
+                _ => break Some(expression),
             }
         };
         (path, remainder)

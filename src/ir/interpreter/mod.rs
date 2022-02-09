@@ -173,7 +173,7 @@ struct IRInterpreterStack {
 pub struct IRInterpreter {
     functions: HashMap<Symbol, IRItemFunctionDef>,
     stack: IRInterpreterStack,
-    label_defs: HashMap<Symbol, u64>
+    label_defs: HashMap<Symbol, u64>,
 }
 
 impl IRInterpreter {
@@ -184,7 +184,7 @@ impl IRInterpreter {
                 values: vec![],
                 frames: vec![],
             },
-            label_defs: HashMap::new()
+            label_defs: HashMap::new(),
         }
     }
 

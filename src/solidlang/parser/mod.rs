@@ -131,6 +131,13 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
         self.start_span();
         let items = self.parse_items(TokenKind::EOF)?;
 
+        if items.len() == 0 {
+            return Ok(ASTModule {
+                items,
+                span: Span { start: 0, len: 0 },
+            });
+        }
+
         let result = Ok(ASTModule {
             items,
             span: self.close_span(),

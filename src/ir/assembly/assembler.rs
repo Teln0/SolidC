@@ -1,10 +1,10 @@
-use std::collections::HashMap;
 use crate::globals::{SessionGlobals, Symbol};
 use crate::ir::comp::{
     IRComp, IRCompBinaryOperation, IRCompBinaryOperationKind, IRCompConstant, IRCompFunctionCall,
     IRCompKind, IRCompUnaryOperation, IRCompUnaryOperationKind,
 };
 use crate::ir::{IRItem, IRItemFunctionDef, IRItemKind, IRModule, IRType, IRValue};
+use std::collections::HashMap;
 use std::iter::Peekable;
 use std::str::Chars;
 
@@ -290,9 +290,9 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
     }
 
     fn get_symbol(&self, token: &IRAssemblyToken) -> Symbol {
-        SessionGlobals::with_interner_mut(|i| i.intern(
-            &self.src[token.start..(token.start + token.len)]
-        ))
+        SessionGlobals::with_interner_mut(|i| {
+            i.intern(&self.src[token.start..(token.start + token.len)])
+        })
     }
 
     fn parse_ir_value(&mut self) -> IRAssemblerResult<IRValue> {
@@ -568,8 +568,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
                         let label = self.get_symbol(&label);
                         let current_index = comps.len() as u64;
                         label_defs.insert(label, current_index);
-                    }
-                    else {
+                    } else {
                         comps.push(self.parse_ir_comp()?);
                     }
                 }
@@ -581,7 +580,7 @@ impl<'a, T: Iterator<Item = IRAssemblyToken>> IRAssembler<'a, T> {
                         params,
                         return_type,
                         comps,
-                        label_defs
+                        label_defs,
                     }),
                 });
 

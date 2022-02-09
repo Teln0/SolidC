@@ -27,7 +27,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
 
             return Ok(ASTExpression {
                 kind: ASTExpressionKind::IntegerLiteral(literal),
-                span: self.close_span()
+                span: self.close_span(),
             });
         }
 
@@ -36,7 +36,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
 
             return Ok(ASTExpression {
                 kind: ASTExpressionKind::Boolean(true),
-                span: self.close_span()
+                span: self.close_span(),
             });
         }
 
@@ -45,7 +45,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
 
             return Ok(ASTExpression {
                 kind: ASTExpressionKind::Boolean(false),
-                span: self.close_span()
+                span: self.close_span(),
             });
         }
 
@@ -65,7 +65,7 @@ impl<'a, T: Iterator<Item = Token>> Parser<'a, T> {
 
             return Ok(ASTExpression {
                 kind: ASTExpressionKind::Block(block),
-                span: self.close_span()
+                span: self.close_span(),
             });
         }
 
